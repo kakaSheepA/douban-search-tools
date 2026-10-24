@@ -86,7 +86,7 @@ test('三站一起搜恰好开三页，预告解说使用B站', async t => {
     menu(doc, 'trailer').click(); menu(doc, 'explain').click();
     assert.equal(new URL(tabs[3]).searchParams.get('keyword'), '怪形前传 预告片');
     assert.equal(new URL(tabs[4]).searchParams.get('keyword'), '怪形前传 解说');
-    assert.deepEqual(storage, []);
+    assert.ok(storage.every(([api, key]) => api === 'GM_getValue' && key === 'zcw.searchSites.v1'));
 });
 test('复制中文优先片名，拒绝剪贴板时可见失败并清除临时节点', async t => {
     const { doc, win } = await boot(t); const copied = [];
@@ -234,8 +234,8 @@ test('筛选无结果后可清空恢复，显式隐藏标记同步移除', async
     assert.equal(doc.querySelector('#m1').hasAttribute('data-zcw-filter-hidden'), false);
 });
 
-test('声明稳定GitHub更新地址且不新增存储权限', () => {
+test('声明稳定GitHub更新地址，仅新增站点配置存储权限', () => {
     assert.match(source, /@updateURL\s+https:\/\/raw\.githubusercontent\.com\/kakaSheepA\/douban-search-tools\/main\/douban-wish-to-zhongchuang\.user\.js/);
     assert.match(source, /@downloadURL\s+https:\/\/raw\.githubusercontent\.com\/kakaSheepA\/douban-search-tools\/main\/douban-wish-to-zhongchuang\.user\.js/);
-    assert.doesNotMatch(source.split('// ==/UserScript==')[0], /@grant\s+GM_(?:getValue|setValue)/);
+    assert.doesNotMatch(source.split('// ==/UserScript==')[0], /@grant\s+GM_(?:listValues|deleteValue)/);
 });

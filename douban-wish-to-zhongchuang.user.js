@@ -1,14 +1,16 @@
 // ==UserScript==
 // @name         豆瓣想看 → 搜中创
 // @namespace    https://github.com/local/douban-zhongchuang
-// @version      2.15.0
-// @description  豆瓣三站快捷搜索、复制片名、年份季数开关与预告解说入口；片单评分与年份组合筛选、全量排序及失败续载。无需本地数据存储。
+// @version      2.16.0
+// @description  豆瓣三站搜索、IMDb/TMDB及自定义搜索站点；复制片名、年份季数开关、片单筛选排序与失败续载。仅保存自定义站点设置。
 // @author       Senior Developer
 // @match        https://movie.douban.com/*
 // @match        https://www.douban.com/doulist/*
 // @match        https://douban.com/doulist/*
 // @icon         https://www.douban.com/favicon.ico
 // @grant        GM_openInTab
+// @grant        GM_getValue
+// @grant        GM_setValue
 // @updateURL    https://raw.githubusercontent.com/kakaSheepA/douban-search-tools/main/douban-wish-to-zhongchuang.user.js
 // @downloadURL  https://raw.githubusercontent.com/kakaSheepA/douban-search-tools/main/douban-wish-to-zhongchuang.user.js
 // @run-at       document-idle
@@ -64,6 +66,22 @@
     .zcw-more-menu button[aria-pressed=true]::before{content:'✓ ';font-weight:bold}
     .zcw-more-menu button:disabled{opacity:.5;cursor:default}
     .zcw-more-status{padding:0 9px;font-size:12px}
+    .zcw-more-menu a{display:block;box-sizing:border-box;padding:7px 9px;border-radius:4px;font:inherit;color:#243247!important;background:transparent!important;text-decoration:none!important}
+    .zcw-more-menu a:hover,.zcw-more-menu a:focus-visible{background:#e2e8f0!important;outline:2px solid #197cff;outline-offset:-2px}
+    .zcw-settings-backdrop{position:fixed;inset:0;z-index:2147483647;display:flex;align-items:center;justify-content:center;padding:12px;background:#0007}
+    .zcw-site-settings{box-sizing:border-box;width:560px;max-width:100%;max-height:calc(100vh - 24px);overflow:auto;padding:20px;border:1px solid #94a3b8;border-radius:8px;background:#fff;color:#243247;box-shadow:0 8px 36px #0004;font:13px/1.6 Arial,sans-serif}
+    .zcw-site-settings h3{font-size:17px;margin:0 0 8px}
+    .zcw-site-settings p{margin:8px 0}
+    .zcw-site-settings label{display:block;margin:8px 0}
+    .zcw-site-settings input:not([type=checkbox]){display:block;box-sizing:border-box;width:100%;padding:8px;font:inherit;color:inherit;background:transparent;border:1px solid #94a3b8;border-radius:4px}
+    .zcw-site-settings button{padding:6px 10px;margin:4px 6px 4px 0;font:inherit;border:1px solid #94a3b8;border-radius:4px;background:#f1f5f9;color:#243247;cursor:pointer}
+    .zcw-site-settings button:disabled{opacity:.45;cursor:default}
+    .zcw-site-settings :focus-visible{outline:2px solid #197cff;outline-offset:2px}
+    .zcw-site-row{display:flex;gap:4px;align-items:center;flex-wrap:wrap;border-bottom:1px solid #94a3b8;padding:5px 0}
+    .zcw-site-row label{flex:1 1 120px;overflow-wrap:anywhere}
+    .zcw-site-row button{padding:4px 7px;margin-right:0}
+    .zcw-site-settings [role=alert]{color:#b42318}
+    .zcw-site-footer{margin-top:12px}
     [data-zcw-filter-hidden]{display:none!important}
     @media(prefers-color-scheme:dark){
         .zcw-search-btn{color:#0f1720!important;background:#8abde1;border-color:#8abde1}
@@ -77,6 +95,11 @@
         .zcw-more-toggle{color:#f1f5f9!important;background:#334155!important;border-color:#94a3b8}
         .zcw-more-menu{background:#202b3b;color:#f1f5f9}
         .zcw-more-menu button:hover,.zcw-more-menu button:focus-visible{background:#334155}
+        .zcw-more-menu a{color:#f1f5f9!important}
+        .zcw-more-menu a:hover,.zcw-more-menu a:focus-visible{background:#334155!important}
+        .zcw-site-settings{background:#202b3b;color:#f1f5f9}
+        .zcw-site-settings button{background:#334155;color:#f1f5f9}
+        .zcw-site-settings [role=alert]{color:#ffb4ab}
     }`;
     function injectStyle() {
         if (document.getElementById('zcw-style')) return;
@@ -347,6 +370,117 @@
         return link;
     }
 
+    const SITE_SETTINGS_KEY = 'zcw.searchSites.v1';
+    let customSites = null, siteLoadError = '';
+    function validateSite(site) {
+        if (!site || typeof site.name !== 'string' || typeof site.template !== 'string') throw Error('请填写站点名称和搜索网址');
+        const name = site.name.trim(), template = site.template.trim();
+        if (!name || name.length > 24) throw Error('站点名称需为1至24字');
+        if (template.length > 2000 || !template.includes('{q}') || /[\r\n\t]/.test(template)) throw Error('搜索网址需包含 {q}，用于代入片名');
+        const url = new URL(template.replaceAll('{q}', 'zcwtitle'));
+        if (!/^https?:$/.test(url.protocol) || url.username || url.password || !/^https?:\/\/[^/?#]+[/?]/i.test(template)) throw Error('请使用不含账号密码的 HTTP(S) 搜索网址');
+        const authority = /^https?:\/\/([^/?#]+)/i.exec(template)?.[1];
+        if (!authority || authority.includes('{q}')) throw Error('{q} 应放在网址路径或查询参数里，不能放在域名里');
+        if (url.hash.includes('zcwtitle')) throw Error('{q} 应放在网址路径或查询参数里');
+        return { name, template, enabled: site.enabled !== false };
+    }
+    function readSites() {
+        if (customSites !== null) return customSites;
+        customSites = [];
+        try {
+            const saved = typeof GM_getValue === 'function' ? GM_getValue(SITE_SETTINGS_KEY, []) : [];
+            if (!Array.isArray(saved) || saved.length > 20) throw Error('设置格式无效');
+            customSites = saved.map(validateSite);
+        } catch (_) { siteLoadError = '站点设置读取失败或格式无效；可在设置中重新保存'; }
+        return customSites;
+    }
+    function siteUrl(site, title) { return site.template.replaceAll('{q}', encodeURIComponent(title)); }
+    function externalIds(entry) {
+        const root = entry.mountMode === 'after' ? document.querySelector('#info') : entry.markNode;
+        const ids = {};
+        if (!root) return ids;
+        const clean = root.cloneNode(true);
+        clean.querySelectorAll('.comment,.comments,.comment-item,.ft,blockquote,.aside,.zcw-group').forEach(n => n.remove());
+        for (const a of clean.querySelectorAll('a[href]')) {
+            try {
+                const u = new URL(a.getAttribute('href'), location.href);
+                if (!/^https?:$/.test(u.protocol) || u.username || u.password) continue;
+                if (/^(?:www\.)?imdb\.com$/.test(u.hostname)) ids.imdb ||= /^\/title\/(tt\d{7,10})(?:\/|$)/.exec(u.pathname)?.[1];
+                if (/^(?:www\.)?themoviedb\.org$/.test(u.hostname)) {
+                    const match = /^\/(movie|tv)\/(\d+)(?:-|\/|$)/.exec(u.pathname);
+                    if (match) ids.tmdb ||= match[1] + '/' + match[2];
+                }
+            } catch (_) { /* 忽略非标准出站链接 */ }
+        }
+        if (entry.mountMode === 'after') ids.imdb ||= /IMDb\s*[:：]?\s*(tt\d{7,10})\b/i.exec(clean.textContent)?.[1];
+        return ids;
+    }
+    let siteSettings = null;
+    function openSiteSettings(origin) {
+        closeMoreMenu();
+        if (siteSettings) return;
+        const draft = readSites().map(s => ({ ...s }));
+        const backdrop = document.createElement('div'); backdrop.className = 'zcw-settings-backdrop';
+        const form = document.createElement('form'); form.className = 'zcw-site-settings';
+        form.setAttribute('role', 'dialog'); form.setAttribute('aria-modal', 'true'); form.setAttribute('aria-label', '自定义搜索站点');
+        form.innerHTML = '<h3>自定义搜索站点</h3><p>站点显示在“更多”里，使用当前片名搜索。网址中的 {q} 代表片名，最多20个站点。</p><div class="zcw-site-list"></div><label>站点名称<input name="siteName" maxlength="24" placeholder="例如：我的搜索站"></label><label>搜索网址<input name="siteTemplate" type="text" maxlength="2000" placeholder="https://example.com/search?q={q}"></label><button type="button" class="zcw-site-add">添加站点</button><p class="zcw-site-notice"></p><div role="alert"></div><div class="zcw-site-footer"><button type="submit" class="zcw-site-save">保存</button><button type="button" class="zcw-site-cancel">取消</button></div>';
+        const list = form.querySelector('.zcw-site-list'), error = form.querySelector('[role=alert]');
+        form.querySelector('.zcw-site-notice').textContent = siteLoadError || '只保存站点设置，不保存影片和搜索历史。';
+        const close = () => {
+            document.removeEventListener('keydown', onKey); backdrop.remove(); siteSettings = null;
+            if (origin.isConnected) origin.focus();
+        };
+        const render = () => {
+            list.replaceChildren();
+            draft.forEach((site, index) => {
+                const row = document.createElement('div'); row.className = 'zcw-site-row';
+                const label = document.createElement('label'), checkbox = document.createElement('input');
+                checkbox.type = 'checkbox'; checkbox.checked = site.enabled;
+                checkbox.addEventListener('change', () => { site.enabled = checkbox.checked; });
+                label.append(checkbox, document.createTextNode(site.name)); label.title = site.template; row.appendChild(label);
+                for (const [action, text] of [['up', '上移'], ['down', '下移'], ['delete', '删除']]) {
+                    const b = document.createElement('button'); b.type = 'button'; b.dataset.siteAction = action; b.textContent = text;
+                    b.setAttribute('aria-label', text + ' ' + site.name);
+                    b.disabled = action === 'up' && index === 0 || action === 'down' && index === draft.length - 1;
+                    b.addEventListener('click', () => {
+                        if (action === 'delete') draft.splice(index, 1);
+                        else { const next = index + (action === 'up' ? -1 : 1); [draft[index], draft[next]] = [draft[next], draft[index]]; }
+                        render(); (list.querySelectorAll('.zcw-site-row')[Math.min(index, draft.length - 1)]?.querySelector('input') || form.querySelector('[name=siteName]')).focus();
+                    }); row.appendChild(b);
+                }
+                list.appendChild(row);
+            });
+        };
+        form.querySelector('.zcw-site-add').addEventListener('click', () => {
+            try {
+                if (draft.length >= 20) throw Error('最多添加20个站点');
+                const site = validateSite({ name: form.elements.siteName.value, template: form.elements.siteTemplate.value });
+                if (draft.some(s => s.name === site.name)) throw Error('站点名称已存在');
+                draft.push(site); render(); error.textContent = ''; form.elements.siteName.value = ''; form.elements.siteTemplate.value = ''; form.elements.siteName.focus();
+            } catch (e) { error.textContent = e instanceof TypeError ? '搜索网址格式无效，请填写完整 HTTP(S) 网址并包含 {q}' : e.message; }
+        });
+        form.addEventListener('submit', e => {
+            e.preventDefault();
+            if (form.elements.siteName.value.trim() || form.elements.siteTemplate.value.trim()) { error.textContent = '填写的站点尚未添加，请先点击“添加站点”或清空输入'; return; }
+            try {
+                if (typeof GM_setValue !== 'function') throw Error('missing API');
+                GM_setValue(SITE_SETTINGS_KEY, draft.map(validateSite)); customSites = draft.map(s => ({ ...s })); siteLoadError = ''; close();
+            } catch (_) { error.textContent = '保存失败，请确认油猴已授予设置存储权限后重试'; }
+        });
+        form.querySelector('.zcw-site-cancel').addEventListener('click', close);
+        backdrop.addEventListener('click', e => { if (e.target === backdrop) close(); });
+        const onKey = e => {
+            if (e.key === 'Escape' && !e.isComposing) { e.preventDefault(); e.stopPropagation(); close(); }
+            if (e.key === 'Tab') {
+                const controls = [...form.querySelectorAll('input,button')].filter(n => !n.disabled);
+                if (e.shiftKey && document.activeElement === controls[0]) { e.preventDefault(); controls.at(-1).focus(); }
+                else if (!e.shiftKey && document.activeElement === controls.at(-1)) { e.preventDefault(); controls[0].focus(); }
+            }
+        };
+        render(); backdrop.appendChild(form); document.body.appendChild(backdrop); siteSettings = backdrop;
+        document.addEventListener('keydown', onKey); form.elements.siteName.focus();
+    }
+
     const SEASON_SUFFIX = /\s*(?:第[零〇一二三四五六七八九十百\d]+季|Season\s+\d+)\s*$/i;
     function movieYear(entry) {
         const node = entry.markNode;
@@ -373,7 +507,7 @@
         let title = context.includeSeason ? context.title : context.mainTitle;
         if (context.includeYear && !new RegExp('\\b' + context.year + '\\b').test(title)) title += ' ' + context.year;
         context.current = title;
-        context.links.forEach(({ link, buildUrl }) => {
+        [...context.links, ...(context.extraLinks || [])].forEach(({ link, buildUrl }) => {
             link.href = buildUrl(title, { literal: true });
             link.setAttribute('data-zcw-title', title); link.title = link.textContent + '：' + title;
         });
@@ -422,6 +556,16 @@
         for (const [action, label, suffix] of [['trailer', 'B站搜预告', '预告片'], ['explain', 'B站搜解说', '解说']]) {
             add(action, label, () => { openSearchUrl(buildBilibiliSearchUrl(context.current + ' ' + suffix, { literal: true })); closeMoreMenu(true); });
         }
+        context.extraLinks = [];
+        const extra = (className, label, buildUrl) => {
+            const link = searchLink(context.current, className, label, () => buildUrl(context.current));
+            context.extraLinks.push({ link, buildUrl }); element.appendChild(link);
+        };
+        extra('zcw-imdb-link', context.ids.imdb ? 'IMDb · 查看条目' : 'IMDb · 搜索片名', title => context.ids.imdb ? 'https://www.imdb.com/title/' + context.ids.imdb + '/' : 'https://www.imdb.com/find/?q=' + encodeURIComponent(title) + '&s=tt');
+        extra('zcw-tmdb-link', context.ids.tmdb ? 'TMDB · 查看条目' : 'TMDB · 搜索片名', title => context.ids.tmdb ? 'https://www.themoviedb.org/' + context.ids.tmdb : 'https://www.themoviedb.org/search?query=' + encodeURIComponent(title));
+        for (const site of readSites().filter(s => s.enabled)) extra('zcw-custom-link', site.name, title => siteUrl(site, title));
+        add('settings', '自定义搜索站点…', () => openSiteSettings(origin));
+        if (siteLoadError) status.textContent = siteLoadError;
         element.appendChild(status); document.body.appendChild(element);
         origin.setAttribute('aria-expanded', 'true');
         const reposition = () => {
@@ -438,7 +582,7 @@
             if (e.key === 'Escape') { e.preventDefault(); e.stopPropagation(); closeMoreMenu(true); }
             if (e.key === 'ArrowDown' || e.key === 'ArrowUp') {
                 e.preventDefault();
-                const buttons = [...element.querySelectorAll('button:not(:disabled)')];
+                const buttons = [...element.querySelectorAll('button:not(:disabled),a[href]')];
                 const index = buttons.indexOf(document.activeElement);
                 buttons[(index + (e.key === 'ArrowDown' ? 1 : buttons.length - 1)) % buttons.length]?.focus();
             }
@@ -446,12 +590,12 @@
         element.querySelector('button').focus();
     }
 
-    function createButton(title, doubanId, year = '') {
+    function createButton(title, doubanId, year = '', ids = {}) {
         const resolved = resolveSearchTitle(title);
         if (!buildSearchUrl(resolved)) return null;
         const group = document.createElement('span'); group.className = 'zcw-group';
         const mainTitle = resolved.replace(SEASON_SUFFIX, '').trim() || resolved;
-        const context = { title: resolved, mainTitle, current: resolved, year, includeYear: false, includeSeason: true, links: [] };
+        const context = { title: resolved, mainTitle, current: resolved, year, ids, includeYear: false, includeSeason: true, links: [] };
         for (const [className, text, buildUrl] of [[BTN_CLASS, CONFIG.BUTTON_TEXT, buildSearchUrl], [BILIBILI_BTN_CLASS, CONFIG.BILIBILI_BUTTON_TEXT, buildBilibiliSearchUrl], [SOQUARK_BTN_CLASS, CONFIG.SOQUARK_BUTTON_TEXT, buildSoquarkSearchUrl]]) {
             const link = searchLink(resolved, className, text, buildUrl);
             if (doubanId) link.setAttribute('data-zcw-id', doubanId);
@@ -537,7 +681,7 @@
 
 
     function renderActions(entry) {
-        const group = createButton(entry.title, entry.doubanId, movieYear(entry));
+        const group = createButton(entry.title, entry.doubanId, movieYear(entry), externalIds(entry));
         if (!group) return false;
         if (entry.mountMode === 'after') {
             if (entry.mount === document.body) entry.mount.appendChild(group);

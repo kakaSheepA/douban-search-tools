@@ -46,8 +46,10 @@ test('原影视库书签回到普通豆瓣首页，不再接管页面', async t 
     assert.deepEqual(storage, []);
 });
 
-test('不再声明中创运行范围或存储权限', () => {
+test('不声明中创运行范围，仅站点设置使用存储，不枚举或删除历史数据', () => {
     const header = source.split('// ==/UserScript==')[0];
     assert.doesNotMatch(header, /@match\s+https:\/\/www\.zhongchuangwl\.com/);
-    assert.doesNotMatch(header, /@grant\s+GM_(getValue|setValue|listValues|deleteValue)/);
+    assert.doesNotMatch(header, /@grant\s+GM_(listValues|deleteValue)/);
+    assert.match(header, /@grant\s+GM_getValue/);
+    assert.match(header, /@grant\s+GM_setValue/);
 });
