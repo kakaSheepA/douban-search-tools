@@ -22,9 +22,9 @@ for (const [name, url] of [
     ['grid想看', 'https://movie.douban.com/mine?status=wish'],
     ['在看', 'https://movie.douban.com/people/test/do'],
     ['看过', 'https://movie.douban.com/people/test/collect'],
-]) test(`${name}每条各有三个搜索入口，无重复注入`, async t => {
+]) test(`${name}每条各有四个搜索入口，无重复注入`, async t => {
     const { doc, Z } = await boot(t, fixture('douban-wish-grid.html'), url);
-    for (const sel of ['.zcw-search-btn', '.zcw-bilibili-btn', '.zcw-soquark-btn']) assert.equal(doc.querySelectorAll(sel).length, 15);
+    for (const sel of ['.zcw-search-btn', '.zcw-bilibili-btn', '.zcw-soquark-btn', '.zcw-pansearch-btn']) assert.equal(doc.querySelectorAll(sel).length, 15);
     Z.process(); Z.process();
     assert.equal(doc.querySelectorAll('.zcw-group').length, 15);
     assert.equal(doc.querySelectorAll('#zcw-style').length, 1);
@@ -87,7 +87,7 @@ test('重复影片在不同条目各有入口，海报与标题不会变两条',
     assert.equal(doc.querySelector('figure .zcw-group'), null);
 });
 
-test('Ctrl点击使用原生链接，不重复打开；GM缺失时三个入口可兜底', async t => {
+test('Ctrl点击使用原生链接，不重复打开；GM缺失时四个入口可兜底', async t => {
     const { doc, win, tabs } = await boot(t, shell(movie(111, '蜘蛛侠')));
     const event = new win.MouseEvent('click', { bubbles: true, cancelable: true, ctrlKey: true });
     doc.querySelector('.zcw-search-btn').dispatchEvent(event);
@@ -95,7 +95,7 @@ test('Ctrl点击使用原生链接，不重复打开；GM缺失时三个入口�
     delete win.GM_openInTab;
     const opened = []; win.open = (...args) => opened.push(args);
     for (const el of doc.querySelectorAll('.zcw-group > a, .zcw-group > button')) el.click();
-    assert.equal(opened.length, 3);
+    assert.equal(opened.length, 4);
     assert.ok(opened.every(args => args[1] === '_blank' && args[2] === 'noopener'));
 });
 

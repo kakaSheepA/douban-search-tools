@@ -81,7 +81,7 @@ test('关键词界面全部删除，更多菜单Escape关闭恢复焦点，外�
 });
 test('三站一起搜恰好开三页，预告解说使用B站', async t => {
     const { doc, tabs, storage } = await boot(t);
-    const expected = [...doc.querySelectorAll('.zcw-group > a')].map(a => a.href);
+    const expected = [...doc.querySelectorAll('.zcw-group > a')].slice(0, 3).map(a => a.href);
     menu(doc, 'all').click(); assert.deepEqual(tabs, expected);
     menu(doc, 'trailer').click(); menu(doc, 'explain').click();
     assert.equal(new URL(tabs[3]).searchParams.get('keyword'), '怪形前传 预告片');

@@ -16,14 +16,15 @@ async function boot(t, html, url) {
     return { win, doc: win.document, storage, tabs };
 }
 
-test('列表只有三个搜索按钮，无状态/资源/影视库UI，全部搜索零存储访问', async t => {
+test('列表四个搜索按钮，无状态/资源/影视库UI，全部搜索零存储访问', async t => {
     const { doc, storage, tabs, win } = await boot(t, fixture('douban-wish-grid.html'), 'https://movie.douban.com/people/test/wish');
     assert.equal(doc.querySelectorAll('.zcw-search-btn').length, 15);
     assert.equal(doc.querySelectorAll('.zcw-bilibili-btn').length, 15);
     assert.equal(doc.querySelectorAll('.zcw-soquark-btn').length, 15);
+    assert.equal(doc.querySelectorAll('.zcw-pansearch-btn').length, 15);
     assert.equal(doc.querySelector('.zcw-status-label, .zcw-res-chip, .zcw-library-chip, #zcw-library, #zcw-toolbar, .zcw-panel'), null);
-    for (const selector of ['.zcw-search-btn', '.zcw-bilibili-btn', '.zcw-soquark-btn']) doc.querySelector(selector).click();
-    assert.equal(tabs.length, 3);
+    for (const selector of ['.zcw-search-btn', '.zcw-bilibili-btn', '.zcw-soquark-btn', '.zcw-pansearch-btn']) doc.querySelector(selector).click();
+    assert.equal(tabs.length, 4);
     assert.equal(new URL(tabs[0]).searchParams.has('zcw_id'), false);
     assert.deepEqual(storage, []);
     for (const name of ['ResourceStore', 'MovieLibrary', 'ResourceWorkflow', 'saveMovie', 'getMovie', 'upgradeStatus']) assert.equal(win.__ZCW__[name], undefined);

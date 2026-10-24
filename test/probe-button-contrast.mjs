@@ -23,7 +23,7 @@ try {
         page.on('request', r => r.respond({ status: 200, contentType: 'text/html; charset=utf-8', body: html }));
         await page.goto('https://www.douban.com/doulist/123/');
         await page.addScriptTag({ content: source });
-        for (const selector of ['.zcw-bilibili-btn', '.zcw-soquark-btn']) for (const state of ['normal', 'hover', 'focus']) {
+        for (const selector of ['.zcw-bilibili-btn', '.zcw-soquark-btn', '.zcw-pansearch-btn']) for (const state of ['normal', 'hover', 'focus']) {
             await page.mouse.move(2, 2);
             await page.evaluate(() => document.activeElement?.blur());
             if (state === 'hover') await page.hover(selector);

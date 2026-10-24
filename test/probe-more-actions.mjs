@@ -27,6 +27,11 @@ try {
     assert.equal(await page.$eval('.zcw-bilibili-btn', n => new URL(n.href).searchParams.get('keyword')), '暗黑 2020');
     assert.equal(await page.$eval('.zcw-imdb-link', n => new URL(n.href).searchParams.get('q')), '暗黑 2020');
     assert.equal(await page.$eval('.zcw-tmdb-link', n => new URL(n.href).searchParams.get('query')), '暗黑 2020');
+    assert.equal(await page.$eval('.zcw-pansearch-btn', n => new URL(n.href).searchParams.get('keyword')), '暗黑 2020');
+    assert.equal(await page.$eval('.zcw-subtitle-link', n => decodeURIComponent(new URL(n.href).pathname)), '/search/暗黑 2020');
+    await page.click('.zcw-pansearch-btn'); await page.click('.zcw-subtitle-link');
+    assert.equal(await page.evaluate(() => window.__tabs.length), 2);
+    await page.evaluate(() => window.__tabs = []);
     for (const theme of ['light', 'dark']) {
         await page.emulateMediaFeatures([{ name: 'prefers-color-scheme', value: theme }]);
         for (const width of [1280, 390]) {

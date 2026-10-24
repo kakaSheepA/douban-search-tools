@@ -1,8 +1,8 @@
 // ==UserScript==
 // @name         豆瓣想看 → 搜中创
 // @namespace    https://github.com/local/douban-zhongchuang
-// @version      2.17.1
-// @description  豆瓣三站搜索、IMDb/TMDB及自定义搜索站点；复制片名、年份季数开关、片单筛选排序与失败续载。仅保存自定义站点设置。
+// @version      2.18.0
+// @description  豆瓣中创/B站/夸克/网盘搜索，字幕与IMDb/TMDB、自定义站点；片单筛选排序及续载。仅保存站点设置。
 // @author       Senior Developer
 // @match        https://movie.douban.com/*
 // @match        https://www.douban.com/doulist/*
@@ -25,6 +25,7 @@
         BUTTON_TEXT: '搜中创',
         BILIBILI_BUTTON_TEXT: '搜B站',
         SOQUARK_BUTTON_TEXT: '搜夸克',
+        PANSEARCH_BUTTON_TEXT: '搜网盘',
         STRIP_TRAILING_PUNCT: true,
         STRIP_SEASON_SUFFIX: false,
         DEBUG: false,
@@ -33,6 +34,7 @@
     const BTN_CLASS = 'zcw-search-btn';
     const BILIBILI_BTN_CLASS = 'zcw-bilibili-btn';
     const SOQUARK_BTN_CLASS = 'zcw-soquark-btn';
+    const PANSEARCH_BTN_CLASS = 'zcw-pansearch-btn';
     const SUBJECT_RE = /\/subject\/(\d+)\/?/;
     const HAS_CJK = /[\u4e00-\u9fa5]/;
     const ROOT_SELECTORS = ['#content .article', '#content', 'body'];
@@ -42,7 +44,7 @@
 
     const CSS = `
     .zcw-group{display:inline}
-    .zcw-search-btn,.zcw-bilibili-btn,.zcw-soquark-btn{
+    .zcw-search-btn,.zcw-bilibili-btn,.zcw-soquark-btn,.zcw-pansearch-btn{
         display:inline-block;margin-left:8px;padding:1px 9px;
         font-family:inherit;font-size:12px;line-height:17px;font-weight:600;
         text-decoration:none!important;white-space:nowrap;vertical-align:middle;
@@ -57,6 +59,9 @@
     .zcw-soquark-btn{color:#fff!important;border-color:#087f70!important;background:#087f70!important}
     .zcw-soquark-btn:hover,.zcw-soquark-btn:focus-visible{background:#06695e!important;border-color:#06695e!important}
     .zcw-soquark-btn:active{background:#05594f!important}
+    .zcw-pansearch-btn{color:#fff!important;border-color:#6250a1!important;background:#6250a1!important}
+    .zcw-pansearch-btn:hover,.zcw-pansearch-btn:focus-visible{background:#503d8b!important;border-color:#503d8b!important}
+    .zcw-pansearch-btn:active{background:#423273!important}
     .zcw-group>a::after,.zcw-group>button::after{content:none!important}
     .zcw-group>a:focus-visible,.zcw-group>button:focus-visible{outline:2px solid #197cff;outline-offset:2px}
     .zcw-more-toggle{margin-left:8px;padding:1px 9px;font:600 12px/17px Arial,sans-serif;color:#334155!important;background:#f1f5f9!important;border:1px solid #94a3b8;border-radius:4px;cursor:pointer;vertical-align:middle;white-space:nowrap}
@@ -92,6 +97,9 @@
         .zcw-soquark-btn{color:#baf6e7!important;border-color:#71dac3!important;background:#18382f!important}
         .zcw-soquark-btn:hover,.zcw-soquark-btn:focus-visible{background:#214b3f!important;border-color:#9aecd9!important}
         .zcw-soquark-btn:active{background:#285b4c!important}
+        .zcw-pansearch-btn{color:#ede5ff!important;background:#382a51!important;border-color:#b7a0e0!important}
+        .zcw-pansearch-btn:hover,.zcw-pansearch-btn:focus-visible{background:#4b396b!important;border-color:#d0b9f4!important}
+        .zcw-pansearch-btn:active{background:#58417d!important}
         .zcw-more-toggle{color:#f1f5f9!important;background:#334155!important;border-color:#94a3b8}
         .zcw-more-menu{background:#202b3b;color:#f1f5f9}
         .zcw-more-menu button:hover,.zcw-more-menu button:focus-visible{background:#334155}
@@ -253,6 +261,15 @@
 
 
     // 三个入口统一打开新标签；不访问任何本地存储。
+    function buildPansearchUrl(title, options) {
+        const query = searchKeyword(title, options);
+        return query ? 'https://www.pansearch.me/search?keyword=' + encodeURIComponent(query) : null;
+    }
+    function buildSubtitleUrl(title, options) {
+        const query = searchKeyword(title, options);
+        return query ? 'https://subhd.me/search/' + encodeURIComponent(query).replace(/'/g, '%27') : null;
+    }
+
     function openSearchUrl(url) {
         if (!url) return false;
         try {
@@ -544,7 +561,7 @@
             const ok = await copyTitle(context.title);
             status.textContent = ok ? '已复制片名' : '复制失败，请重试或手动复制片名'; button.disabled = false;
         });
-        add('all', '三站一起搜', () => { context.links.forEach(({ link }) => openSearchUrl(link.href)); closeMoreMenu(true); });
+        add('all', '三站一起搜', () => { context.links.slice(0, 3).forEach(({ link }) => openSearchUrl(link.href)); closeMoreMenu(true); });
         add('year', '搜索时加年份' + (context.year ? '（' + context.year + '）' : '（未提供）'), button => {
             context.includeYear = !context.includeYear; updateSearchLinks(context);
             button.setAttribute('aria-pressed', String(context.includeYear));
@@ -563,6 +580,7 @@
         };
         extra('zcw-imdb-link', context.ids.imdb ? 'IMDb · 查看条目' : 'IMDb · 搜索片名', title => context.ids.imdb ? 'https://www.imdb.com/title/' + context.ids.imdb + '/' : 'https://www.imdb.com/find/?q=' + encodeURIComponent(title) + '&s=tt');
         extra('zcw-tmdb-link', context.ids.tmdb ? 'TMDB · 查看条目' : 'TMDB · 搜索片名', title => context.ids.tmdb ? 'https://www.themoviedb.org/' + context.ids.tmdb : 'https://www.themoviedb.org/search?query=' + encodeURIComponent(title));
+        extra('zcw-subtitle-link', '搜字幕 · SubHD', title => buildSubtitleUrl(title, { literal: true }));
         for (const site of readSites().filter(s => s.enabled)) extra('zcw-custom-link', site.name, title => siteUrl(site, title));
         add('settings', '自定义搜索站点…', () => openSiteSettings(origin));
         if (siteLoadError) status.textContent = siteLoadError;
@@ -596,7 +614,7 @@
         const group = document.createElement('span'); group.className = 'zcw-group';
         const mainTitle = resolved.replace(SEASON_SUFFIX, '').trim() || resolved;
         const context = { title: resolved, mainTitle, current: resolved, year, ids, includeYear: false, includeSeason: true, links: [] };
-        for (const [className, text, buildUrl] of [[BTN_CLASS, CONFIG.BUTTON_TEXT, buildSearchUrl], [BILIBILI_BTN_CLASS, CONFIG.BILIBILI_BUTTON_TEXT, buildBilibiliSearchUrl], [SOQUARK_BTN_CLASS, CONFIG.SOQUARK_BUTTON_TEXT, buildSoquarkSearchUrl]]) {
+        for (const [className, text, buildUrl] of [[BTN_CLASS, CONFIG.BUTTON_TEXT, buildSearchUrl], [BILIBILI_BTN_CLASS, CONFIG.BILIBILI_BUTTON_TEXT, buildBilibiliSearchUrl], [SOQUARK_BTN_CLASS, CONFIG.SOQUARK_BUTTON_TEXT, buildSoquarkSearchUrl], [PANSEARCH_BTN_CLASS, CONFIG.PANSEARCH_BUTTON_TEXT, buildPansearchUrl]]) {
             const link = searchLink(resolved, className, text, buildUrl);
             if (doubanId) link.setAttribute('data-zcw-id', doubanId);
             context.links.push({ link, buildUrl }); group.appendChild(link);
@@ -1084,7 +1102,7 @@
     window.__ZCW__ = {
         CONFIG, DoulistSort, preferredSearchTitle, extractTitle, resolveSearchTitle,
         sanitizeSearchTitle, MAX_SEARCH_TITLE_CHARS, buildSearchUrl, buildBilibiliKeyword,
-        buildBilibiliSearchUrl, buildSoquarkSearchUrl, BILIBILI_SEARCH_URL, SOQUARK_SEARCH_URL,
+        buildBilibiliSearchUrl, buildSoquarkSearchUrl, buildPansearchUrl, buildSubtitleUrl, BILIBILI_SEARCH_URL, SOQUARK_SEARCH_URL,
         ExternalSearchAction, createButton, createBilibiliButton, createSoquarkButton,
         BILIBILI_BTN_CLASS, SOQUARK_BTN_CLASS, detectPage, detectDoubanPage,
         process, getRoot, collectAnchors, pickTitleAnchor, extractDoubanMovie,

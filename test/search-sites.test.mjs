@@ -68,7 +68,7 @@ test('设置取消不生效，停用、排序、删除正常且不改动原三�
     form.querySelector('[data-site-action=down]').click();
     form.querySelector('input[type=checkbox]').click(); form.querySelector('.zcw-site-save').click();
     assert.equal(more(b.doc).querySelector('.zcw-custom-link').textContent, '甲');
-    assert.equal(b.doc.querySelectorAll('.zcw-group > a').length, 3);
+    assert.equal(b.doc.querySelectorAll('.zcw-group > a').length, 4);
     assert.equal(b.writes[0][1][0].name, '乙'); assert.equal(b.writes[0][1][0].enabled, false);
 });
 test('拒绝无占位符、脚本、凭据、host占位符；错误配置不执行，保存失败可重试', async t => {
