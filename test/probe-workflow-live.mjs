@@ -1,4 +1,4 @@
-/** 真实Chrome开发验证：原生链接、关键词编辑、全量组合筛选、受控503后的续载。
+/** 真实Chrome开发验证：原生链接、更多操作菜单、全量组合筛选、受控503后的续载。
  * GM API模拟；不会访问或修改已安装的油猴扩展。
  */
 import fs from 'node:fs';
@@ -54,17 +54,13 @@ try {
         results.native.push({ selector, modifier, url: await nativePopup(page, selector, modifier) });
     }
     assert.equal(await page.evaluate(() => window.__tabs.length), 0, '原生修饰键和中键不调用GM重复开页');
-    await page.click('.zcw-keyword-edit');
-    await page.click('[data-language=english]');
-    assert.equal(await page.$eval('.zcw-keyword-editor input', n => n.value), 'The Thing');
-    await (await page.$('.zcw-keyword-editor')).screenshot({ path: path.join(out, 'keyword-editor.png') });
-    await page.click('.zcw-keyword-apply');
-    results.english = await page.$$eval('.zcw-group:first-of-type > a', links => links.slice(0, 3).map(n => n.href));
-    assert.equal(new URL(results.english[1]).searchParams.get('keyword'), 'The Thing');
-    await page.click('.zcw-keyword-edit');
-    await page.$eval('.zcw-keyword-editor input', n => { n.value = '自定义 Beta'; n.dispatchEvent(new Event('input')); });
-    await page.click('.zcw-keyword-apply');
-    assert.equal(await page.$eval('.zcw-bilibili-btn', n => new URL(n.href).searchParams.get('keyword')), '自定义 Beta');
+    assert.equal(await page.$('[class*="zcw-keyword"]'), null);
+    await page.click('.zcw-more-toggle');
+    await (await page.$('.zcw-more-menu')).screenshot({ path: path.join(out, 'more-menu.png') });
+    const initial = await page.$$eval('.zcw-group > a', nodes => nodes.slice(0, 3).map(n => n.href));
+    await page.click('[data-zcw-action=all]');
+    assert.deepEqual(await page.evaluate(() => window.__tabs), initial);
+    await page.evaluate(() => window.__tabs = []);
     await page.focus('.zcw-soquark-btn'); await page.keyboard.press('Enter'); await page.keyboard.press('Space');
     assert.equal(await page.evaluate(() => window.__tabs.length), 2, '键盘各开一次');
     for (const [name, value] of [['ratingMin', '8'], ['yearFrom', '2000'], ['yearTo', '2010']]) await page.type(`[name=${name}]`, value);

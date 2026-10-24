@@ -1,8 +1,8 @@
 // ==UserScript==
 // @name         豆瓣想看 → 搜中创
 // @namespace    https://github.com/local/douban-zhongchuang
-// @version      2.14.1
-// @description  豆瓣三站快捷搜索（中文/英文/自定义关键词）；片单评分与年份组合筛选、全量排序及失败续载。无需本地数据存储。
+// @version      2.15.0
+// @description  豆瓣三站快捷搜索、复制片名、年份季数开关与预告解说入口；片单评分与年份组合筛选、全量排序及失败续载。无需本地数据存储。
 // @author       Senior Developer
 // @match        https://movie.douban.com/*
 // @match        https://www.douban.com/doulist/*
@@ -57,16 +57,13 @@
     .zcw-soquark-btn:active{background:#05594f!important}
     .zcw-group>a::after,.zcw-group>button::after{content:none!important}
     .zcw-group>a:focus-visible,.zcw-group>button:focus-visible{outline:2px solid #197cff;outline-offset:2px}
-    .zcw-keyword-edit{margin-left:8px;padding:1px 5px;font:inherit;font-size:12px;color:#666;border:0;border-bottom:1px dotted #999;background:transparent;cursor:pointer}
-    .zcw-keyword-editor{position:fixed;z-index:2147483646;box-sizing:border-box;width:min(390px,calc(100vw - 24px));padding:16px;border:1px solid #bbb;border-radius:8px;background:#fff;color:#333;box-shadow:0 6px 28px #0003;font:13px/1.6 Arial,sans-serif}
-    .zcw-keyword-editor h3{margin:0 0 8px;font-size:15px}
-    .zcw-keyword-editor input{box-sizing:border-box;width:100%;padding:7px;margin:8px 0;font:inherit;color:inherit;background:transparent;border:1px solid #aaa;border-radius:4px}
-    .zcw-keyword-editor button{padding:4px 9px;margin:0 6px 6px 0;font:inherit;cursor:pointer;color:inherit;background:transparent;border:1px solid #aaa;border-radius:4px}
-    .zcw-keyword-editor button[aria-pressed=true]{color:#fff;background:#197cff;border-color:#197cff}
-    .zcw-keyword-editor button:disabled{opacity:.4;cursor:default}
-    .zcw-keyword-editor small{display:block;color:#777}
-    .zcw-keyword-editor [role=alert]{color:#b42318}
-    .zcw-keyword-editor :focus-visible{outline:2px solid #197cff;outline-offset:2px}
+    .zcw-more-toggle{margin-left:8px;padding:1px 9px;font:600 12px/17px Arial,sans-serif;color:#334155!important;background:#f1f5f9!important;border:1px solid #94a3b8;border-radius:4px;cursor:pointer;vertical-align:middle;white-space:nowrap}
+    .zcw-more-menu{position:fixed;z-index:2147483646;box-sizing:border-box;width:224px;max-width:calc(100vw - 16px);max-height:calc(100vh - 16px);overflow:auto;padding:8px;border:1px solid #94a3b8;border-radius:7px;background:#fff;color:#243247;box-shadow:0 5px 24px #0003;font:13px/1.6 Arial,sans-serif}
+    .zcw-more-menu button{display:block;width:100%;box-sizing:border-box;padding:7px 9px;border:0;border-radius:4px;text-align:left;font:inherit;color:inherit;background:transparent;cursor:pointer}
+    .zcw-more-menu button:hover,.zcw-more-menu button:focus-visible{background:#e2e8f0;outline:2px solid #197cff;outline-offset:-2px}
+    .zcw-more-menu button[aria-pressed=true]::before{content:'✓ ';font-weight:bold}
+    .zcw-more-menu button:disabled{opacity:.5;cursor:default}
+    .zcw-more-status{padding:0 9px;font-size:12px}
     [data-zcw-filter-hidden]{display:none!important}
     @media(prefers-color-scheme:dark){
         .zcw-search-btn{color:#0f1720!important;background:#8abde1;border-color:#8abde1}
@@ -77,10 +74,9 @@
         .zcw-soquark-btn{color:#baf6e7!important;border-color:#71dac3!important;background:#18382f!important}
         .zcw-soquark-btn:hover,.zcw-soquark-btn:focus-visible{background:#214b3f!important;border-color:#9aecd9!important}
         .zcw-soquark-btn:active{background:#285b4c!important}
-        .zcw-keyword-edit{color:#ccc}
-        .zcw-keyword-editor{background:#252525;color:#eee;border-color:#666}
-        .zcw-keyword-editor small{color:#bbb}
-        .zcw-keyword-editor [role=alert]{color:#ffb4ab}
+        .zcw-more-toggle{color:#f1f5f9!important;background:#334155!important;border-color:#94a3b8}
+        .zcw-more-menu{background:#202b3b;color:#f1f5f9}
+        .zcw-more-menu button:hover,.zcw-more-menu button:focus-visible{background:#334155}
     }`;
     function injectStyle() {
         if (document.getElementById('zcw-style')) return;
@@ -329,38 +325,6 @@
     }
 
 
-    function searchNames(title, raw = title) {
-        const preferred = resolveSearchTitle(title);
-        const chinese = HAS_CJK.test(preferred) && !/[\u3040-\u30ff]/.test(preferred) ? preferred : '';
-        // 只把别名分隔斜杠拆开，Face/Off等英文片名内部斜杠保留。
-        const separated = String(raw || '').replace(/\s*\/\s*/g, (slash, index, all) => {
-            const neighbors = (all[index - 1] || '') + (all[index + slash.length] || '');
-            return /\s/.test(slash) || /[\u4e00-\u9fa5\u3040-\u30ff]/.test(neighbors) ? '\n' : slash;
-        });
-        const parts = separated.split('\n').map(s => s.replace(/\s*[（(](?:\d{4}|港|台|豆瓣(?:电影)?)[）)]\s*$/, '').trim()).filter(Boolean);
-        const roman = s => /[a-z]/i.test(s) && !/[\u4e00-\u9fa5\u3040-\u30ff]/.test(s);
-        let english = !chinese && roman(preferred) ? preferred : parts.find(roman) || '';
-        if (!english) {
-            for (const part of parts) {
-                const chunks = part.split(/\s+/), groups = [];
-                let group = [];
-                for (const token of chunks) {
-                    if (/[\u4e00-\u9fa5\u3040-\u30ff]/.test(token)) {
-                        if (group.length) groups.push(group); group = [];
-                    } else group.push(token);
-                }
-                if (group.length) groups.push(group);
-                for (const words of groups) {
-                    while (words.length && /^(?:\d{4}|\d+[dDkK]|Re[:：])$/.test(words[0])) words.shift();
-                    const candidate = words.join(' ');
-                    if (roman(candidate) && !/^(?:Season|Part)\s+\d+$/i.test(candidate)) { english = candidate; break; }
-                }
-                if (english) break;
-            }
-        }
-        return { auto: preferred, chinese, english };
-    }
-
     function searchLink(title, className, text, buildUrl) {
         if (typeof title !== 'string' || !title.trim()) return null;
         const resolved = resolveSearchTitle(title), url = buildUrl(resolved);
@@ -383,82 +347,122 @@
         return link;
     }
 
-    let keywordEditor = null;
-    function closeKeywordEditor() {
-        if (!keywordEditor) return;
-        const { element, onOutside, origin } = keywordEditor;
-        document.removeEventListener('click', onOutside);
-        element.remove(); keywordEditor = null;
-        if (origin.isConnected) origin.focus();
+    const SEASON_SUFFIX = /\s*(?:第[零〇一二三四五六七八九十百\d]+季|Season\s+\d+)\s*$/i;
+    function movieYear(entry) {
+        const node = entry.markNode;
+        const headingYear = node.querySelector('.year')?.textContent || '';
+        const details = node.querySelector('.abstract')?.textContent || '';
+        const intro = node.querySelector('.intro')?.textContent || '';
+        return headingYear.match(/\b(?:18|19|20)\d{2}\b/)?.[0] ||
+            details.match(/年份\s*[:：]\s*((?:18|19|20)\d{2})\b/)?.[1] ||
+            intro.match(/^\s*((?:18|19|20)\d{2})(?=[-(（\s/]|$)/)?.[1] || '';
     }
 
-    function openKeywordEditor(context, origin) {
-        closeKeywordEditor();
-        const element = document.createElement('div');
-        element.className = 'zcw-keyword-editor';
-        element.setAttribute('role', 'dialog'); element.setAttribute('aria-label', '编辑搜索关键词');
-        const heading = document.createElement('h3'); heading.textContent = '搜索关键词'; element.appendChild(heading);
-        const modes = document.createElement('div'); element.appendChild(modes);
-        const input = document.createElement('input'); input.type = 'text'; input.setAttribute('aria-label', '搜索关键词'); input.value = context.keyword;
-        const buttons = [];
-        for (const [mode, label] of [['auto', '自动'], ['chinese', '中文名'], ['english', '英文名']]) {
-            const button = document.createElement('button'); button.type = 'button'; button.textContent = label;
-            button.dataset.language = mode; button.disabled = !context.names[mode];
-            button.setAttribute('aria-pressed', String(context.mode === mode)); buttons.push(button);
-            button.addEventListener('click', () => { input.value = context.names[mode]; buttons.forEach(b => b.setAttribute('aria-pressed', String(b === button))); input.focus(); });
-            modes.appendChild(button);
-        }
-        element.appendChild(input);
-        input.addEventListener('input', () => buttons.forEach(b => b.setAttribute('aria-pressed', 'false')));
-        const hint = document.createElement('small'); hint.textContent = '只修改本条搜索词，刷新后恢复。中创仍最多18字。'; element.appendChild(hint);
-        const message = document.createElement('div'); message.setAttribute('role', 'alert'); element.appendChild(message);
-        const apply = document.createElement('button'); apply.type = 'button'; apply.className = 'zcw-keyword-apply'; apply.textContent = '应用';
-        const cancel = document.createElement('button'); cancel.type = 'button'; cancel.className = 'zcw-keyword-cancel'; cancel.textContent = '取消';
-        const commit = () => {
-            const keyword = searchKeyword(input.value, { literal: true });
-            if (!keyword) { message.textContent = '关键词不能为空'; input.focus(); return; }
-            const urls = context.links.map(({ buildUrl }) => buildUrl(keyword, { literal: true }));
-            if (urls.some(url => !url)) { message.textContent = '关键词无法用于中创搜索，请输入有效片名'; input.focus(); return; }
-            context.keyword = keyword;
-            context.mode = buttons.find(b => b.getAttribute('aria-pressed') === 'true')?.dataset.language || 'manual';
-            context.links.forEach(({ link }, index) => {
-                link.href = urls[index]; link.setAttribute('data-zcw-title', keyword);
-                link.title = link.textContent + '：' + keyword;
-            });
-            origin.title = '当前关键词：' + keyword;
-            closeKeywordEditor();
-        };
-        apply.addEventListener('click', commit); cancel.addEventListener('click', closeKeywordEditor);
-        element.addEventListener('keydown', e => {
-            if (e.isComposing || e.keyCode === 229) return;
-            if (e.key === 'Escape') { e.preventDefault(); closeKeywordEditor(); }
-            else if (e.key === 'Enter' && e.target === input) { e.preventDefault(); commit(); }
+    async function copyTitle(title) {
+        try { await navigator.clipboard.writeText(title); return true; } catch (_) { /* 兼容未授权或旧浏览器 */ }
+        const input = document.createElement('textarea');
+        input.value = title; input.readOnly = true;
+        input.style.cssText = 'position:fixed;left:-10000px;top:0';
+        const previous = document.activeElement;
+        document.body.appendChild(input); input.select();
+        try { return document.execCommand('copy'); } catch (_) { return false; }
+        finally { input.remove(); if (previous?.isConnected) previous.focus(); }
+    }
+
+    function updateSearchLinks(context) {
+        let title = context.includeSeason ? context.title : context.mainTitle;
+        if (context.includeYear && !new RegExp('\\b' + context.year + '\\b').test(title)) title += ' ' + context.year;
+        context.current = title;
+        context.links.forEach(({ link, buildUrl }) => {
+            link.href = buildUrl(title, { literal: true });
+            link.setAttribute('data-zcw-title', title); link.title = link.textContent + '：' + title;
         });
-        element.append(apply, cancel); document.body.appendChild(element);
-        const rect = origin.getBoundingClientRect();
-        element.style.left = Math.max(12, Math.min(rect.left, window.innerWidth - 402)) + 'px';
-        element.style.top = Math.max(12, Math.min(rect.bottom + 6, window.innerHeight - element.offsetHeight - 12)) + 'px';
-        const onOutside = e => { if (!element.contains(e.target) && e.target !== origin) closeKeywordEditor(); };
-        document.addEventListener('click', onOutside);
-        keywordEditor = { element, onOutside, origin }; input.focus();
     }
 
-    function createButton(title, doubanId, names = searchNames(title)) {
+    let moreMenu = null;
+    function closeMoreMenu(focus = false) {
+        if (!moreMenu) return;
+        const { element, origin, outside, reposition } = moreMenu;
+        document.removeEventListener('click', outside);
+        window.removeEventListener('resize', reposition);
+        window.removeEventListener('scroll', reposition, true);
+        element.remove(); origin.setAttribute('aria-expanded', 'false'); moreMenu = null;
+        if (focus && origin.isConnected) origin.focus();
+    }
+    function openMoreMenu(context, origin) {
+        if (moreMenu?.origin === origin) { closeMoreMenu(true); return; }
+        closeMoreMenu();
+        const element = document.createElement('div'); element.className = 'zcw-more-menu';
+        element.setAttribute('role', 'dialog'); element.setAttribute('aria-label', '影片操作');
+        const status = document.createElement('div'); status.className = 'zcw-more-status'; status.setAttribute('role', 'status');
+        const add = (action, text, handler, disabled = false, pressed) => {
+            const button = document.createElement('button'); button.type = 'button';
+            button.dataset.zcwAction = action; button.textContent = text; button.disabled = disabled;
+            if (pressed !== undefined) button.setAttribute('aria-pressed', String(pressed));
+            button.addEventListener('click', async e => {
+                e.preventDefault(); e.stopPropagation();
+                try { await handler(button); } catch (_) { status.textContent = '操作失败，请重试'; }
+            });
+            element.appendChild(button); return button;
+        };
+        add('copy', '复制片名', async button => {
+            button.disabled = true;
+            const ok = await copyTitle(context.title);
+            status.textContent = ok ? '已复制片名' : '复制失败，请重试或手动复制片名'; button.disabled = false;
+        });
+        add('all', '三站一起搜', () => { context.links.forEach(({ link }) => openSearchUrl(link.href)); closeMoreMenu(true); });
+        add('year', '搜索时加年份' + (context.year ? '（' + context.year + '）' : '（未提供）'), button => {
+            context.includeYear = !context.includeYear; updateSearchLinks(context);
+            button.setAttribute('aria-pressed', String(context.includeYear));
+        }, !context.year, context.includeYear);
+        add('season', '搜索时保留季数', button => {
+            context.includeSeason = !context.includeSeason; updateSearchLinks(context);
+            button.setAttribute('aria-pressed', String(context.includeSeason));
+        }, context.mainTitle === context.title, context.includeSeason);
+        for (const [action, label, suffix] of [['trailer', 'B站搜预告', '预告片'], ['explain', 'B站搜解说', '解说']]) {
+            add(action, label, () => { openSearchUrl(buildBilibiliSearchUrl(context.current + ' ' + suffix, { literal: true })); closeMoreMenu(true); });
+        }
+        element.appendChild(status); document.body.appendChild(element);
+        origin.setAttribute('aria-expanded', 'true');
+        const reposition = () => {
+            if (!origin.isConnected || origin.closest('[hidden]')) { closeMoreMenu(); return; }
+            const rect = origin.getBoundingClientRect();
+            element.style.left = Math.max(8, Math.min(rect.left, window.innerWidth - element.offsetWidth - 8)) + 'px';
+            element.style.top = Math.max(8, Math.min(rect.bottom + 5, window.innerHeight - element.offsetHeight - 8)) + 'px';
+        };
+        const outside = e => { if (!element.contains(e.target) && !origin.contains(e.target)) closeMoreMenu(); };
+        moreMenu = { element, origin, outside, reposition }; reposition();
+        document.addEventListener('click', outside);
+        window.addEventListener('resize', reposition); window.addEventListener('scroll', reposition, true);
+        element.addEventListener('keydown', e => {
+            if (e.key === 'Escape') { e.preventDefault(); e.stopPropagation(); closeMoreMenu(true); }
+            if (e.key === 'ArrowDown' || e.key === 'ArrowUp') {
+                e.preventDefault();
+                const buttons = [...element.querySelectorAll('button:not(:disabled)')];
+                const index = buttons.indexOf(document.activeElement);
+                buttons[(index + (e.key === 'ArrowDown' ? 1 : buttons.length - 1)) % buttons.length]?.focus();
+            }
+        });
+        element.querySelector('button').focus();
+    }
+
+    function createButton(title, doubanId, year = '') {
         const resolved = resolveSearchTitle(title);
         if (!buildSearchUrl(resolved)) return null;
-        const group = document.createElement('span');
-        group.className = 'zcw-group';
-        const context = { names, keyword: resolved, mode: 'auto', links: [] };
+        const group = document.createElement('span'); group.className = 'zcw-group';
+        const mainTitle = resolved.replace(SEASON_SUFFIX, '').trim() || resolved;
+        const context = { title: resolved, mainTitle, current: resolved, year, includeYear: false, includeSeason: true, links: [] };
         for (const [className, text, buildUrl] of [[BTN_CLASS, CONFIG.BUTTON_TEXT, buildSearchUrl], [BILIBILI_BTN_CLASS, CONFIG.BILIBILI_BUTTON_TEXT, buildBilibiliSearchUrl], [SOQUARK_BTN_CLASS, CONFIG.SOQUARK_BUTTON_TEXT, buildSoquarkSearchUrl]]) {
             const link = searchLink(resolved, className, text, buildUrl);
             if (doubanId) link.setAttribute('data-zcw-id', doubanId);
             context.links.push({ link, buildUrl }); group.appendChild(link);
         }
-        const edit = document.createElement('button'); edit.type = 'button'; edit.className = 'zcw-keyword-edit'; edit.textContent = '关键词';
-        edit.title = '编辑搜索关键词'; edit.addEventListener('click', e => { e.preventDefault(); e.stopPropagation(); openKeywordEditor(context, edit); });
-        group.appendChild(edit);
-        return group;
+        const more = document.createElement('button'); more.type = 'button'; more.className = 'zcw-more-toggle'; more.textContent = '更多 ▾';
+        more.setAttribute('aria-haspopup', 'dialog'); more.setAttribute('aria-expanded', 'false');
+        more.addEventListener('click', e => { e.preventDefault(); e.stopPropagation(); openMoreMenu(context, more); });
+        group.appendChild(more); return group;
     }
+
     function createBilibiliButton(title) {
         return searchLink(title, BILIBILI_BTN_CLASS, CONFIG.BILIBILI_BUTTON_TEXT, buildBilibiliSearchUrl);
     }
@@ -509,8 +513,7 @@
             const doubanId = subjectId(titleAnchor);
             const title = extractTitle(titleAnchor);
             if (!title) return;
-            const raw = [titleAnchor.textContent, titleAnchor.getAttribute('title'), titleAnchor.querySelector('img')?.alt].filter(s => s?.trim()).join(' / ') || title;
-            entries.push({ doubanId, title, names: searchNames(title, raw), titleAnchor, markNode: box, mount: titleAnchor, mountMode: 'list' });
+            entries.push({ doubanId, title, titleAnchor, markNode: box, mount: titleAnchor, mountMode: 'list' });
         });
         return entries;
     }
@@ -529,13 +532,12 @@
         if (!title) return [];
         // 挂载点：优先 h1；h1 缺失时退回 #content / root / body（保证按钮总能插入）
         const mount = h1 || document.querySelector('#content') || root || document.body;
-        const raw = h1?.textContent || document.title;
-        return [{ doubanId: page.id, title, names: searchNames(title, raw), titleAnchor: h1 || mount, markNode: mount, mount: mount, mountMode: 'after' }];
+        return [{ doubanId: page.id, title, titleAnchor: h1 || mount, markNode: mount, mount: mount, mountMode: 'after' }];
     }
 
 
     function renderActions(entry) {
-        const group = createButton(entry.title, entry.doubanId, entry.names);
+        const group = createButton(entry.title, entry.doubanId, movieYear(entry));
         if (!group) return false;
         if (entry.mountMode === 'after') {
             if (entry.mount === document.body) entry.mount.appendChild(group);

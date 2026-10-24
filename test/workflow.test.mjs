@@ -64,83 +64,68 @@ test('修饰键和中键保持原生跳转，同时隔离外层行点击处理',
     assert.equal(tabs.length, 0);
 });
 
-test('英文切换和手动关键词同步三个href，中键复制使用新词，取消/Escape不应用', async t => {
-    const { doc, tabs, storage, win } = await boot(t);
-    const edit = doc.querySelector('.zcw-keyword-edit'); assert.ok(edit, '应有关键词编辑入口'); edit.click();
-    const editor = doc.querySelector('.zcw-keyword-editor'); assert.ok(editor);
-    editor.querySelector('[data-language=english]').click();
-    const input = editor.querySelector('input'); assert.equal(input.value, 'The Thing');
-    editor.querySelector('.zcw-keyword-apply').click();
-    assert.equal(doc.querySelector('.zcw-keyword-editor'), null);
-    assert.equal(decodeURIComponent(new URL(doc.querySelector('.zcw-search-btn').href).pathname), '/s/The Thing/');
-    assert.equal(new URL(doc.querySelector('.zcw-bilibili-btn').href).searchParams.get('keyword'), 'The Thing');
-    assert.equal(decodeURIComponent(new URL(doc.querySelector('.zcw-soquark-btn').href).pathname), '/s/The Thing.html');
-    edit.click(); doc.querySelector('.zcw-keyword-editor input').value = '自定义 Beta';
-    doc.querySelector('.zcw-keyword-apply').click();
-    assert.equal(new URL(doc.querySelector('.zcw-bilibili-btn').href).searchParams.get('keyword'), '自定义 Beta');
-    doc.querySelector('.zcw-soquark-btn').click();
-    assert.equal(decodeURIComponent(new URL(tabs[0]).pathname), '/s/自定义 Beta.html');
-    const before = doc.querySelector('.zcw-soquark-btn').href;
-    edit.click(); doc.querySelector('.zcw-keyword-editor input').value = '别的';
-    doc.querySelector('.zcw-keyword-editor').dispatchEvent(new win.KeyboardEvent('keydown', { key: 'Escape', bubbles: true }));
-    assert.equal(doc.querySelector('.zcw-keyword-editor'), null);
-    assert.equal(doc.querySelector('.zcw-soquark-btn').href, before);
+function menu(doc, action) {
+    if (!doc.querySelector('.zcw-more-menu')) doc.querySelector('.zcw-more-toggle').click();
+    const button = doc.querySelector(`[data-zcw-action="${action}"]`);
+    assert.ok(button, action); return button;
+}
+test('关键词界面全部删除，更多菜单Escape关闭恢复焦点，外部点击关闭', async t => {
+    const { doc, win } = await boot(t);
+    assert.equal(doc.querySelector('[class*="zcw-keyword"]'), null);
+    const toggle = doc.querySelector('.zcw-more-toggle'); assert.ok(toggle); toggle.click();
+    assert.equal(toggle.getAttribute('aria-expanded'), 'true');
+    assert.doesNotMatch(doc.querySelector('.zcw-more-menu').textContent, /关键词|中文名|英文名/);
+    doc.querySelector('.zcw-more-menu').dispatchEvent(new win.KeyboardEvent('keydown', { key: 'Escape', bubbles: true }));
+    assert.equal(doc.querySelector('.zcw-more-menu'), null); assert.equal(doc.activeElement, toggle);
+    toggle.click(); doc.body.click(); assert.equal(doc.querySelector('.zcw-more-menu'), null);
+});
+test('三站一起搜恰好开三页，预告解说使用B站', async t => {
+    const { doc, tabs, storage } = await boot(t);
+    const expected = [...doc.querySelectorAll('.zcw-group > a')].map(a => a.href);
+    menu(doc, 'all').click(); assert.deepEqual(tabs, expected);
+    menu(doc, 'trailer').click(); menu(doc, 'explain').click();
+    assert.equal(new URL(tabs[3]).searchParams.get('keyword'), '怪形前传 预告片');
+    assert.equal(new URL(tabs[4]).searchParams.get('keyword'), '怪形前传 解说');
     assert.deepEqual(storage, []);
 });
-
-test('空关键词不应用；无中文或英文候选时禁用对应切换', async t => {
-    const { doc } = await boot(t, page(item(1, 8, 2000, 'Spider-Man')));
-    doc.querySelector('.zcw-keyword-edit').click();
-    assert.equal(doc.querySelector('[data-language=chinese]').disabled, true);
-    doc.querySelector('.zcw-keyword-editor input').value = '  ';
-    doc.querySelector('.zcw-keyword-apply').click();
-    assert.ok(doc.querySelector('.zcw-keyword-editor'));
-    assert.match(doc.querySelector('.zcw-keyword-editor').textContent, /不能为空/);
-    doc.querySelector('.zcw-keyword-cancel').click();
-    assert.equal(doc.querySelector('.zcw-keyword-editor'), null);
+test('复制中文优先片名，拒绝剪贴板时可见失败并清除临时节点', async t => {
+    const { doc, win } = await boot(t); const copied = [];
+    Object.defineProperty(win.navigator, 'clipboard', { value: { writeText: async text => copied.push(text) }, configurable: true });
+    menu(doc, 'copy').click(); await wait(0); assert.deepEqual(copied, ['怪形前传']);
+    Object.defineProperty(win.navigator, 'clipboard', { value: { writeText: async () => { throw Error('denied'); } } });
+    doc.execCommand = () => false;
+    menu(doc, 'copy').click(); await wait(0);
+    assert.match(doc.querySelector('.zcw-more-status').textContent, /失败/);
+    assert.equal(doc.querySelector('textarea'), null);
+});
+test('年份季数可组合和恢复，不累积，三站同步', async t => {
+    const { doc } = await boot(t, page(item(1, 8, 2020, '暗黑 第三季 Dark Season 3')));
+    const current = () => new URL(doc.querySelector('.zcw-bilibili-btn').href).searchParams.get('keyword');
+    assert.equal(current(), '暗黑 第三季');
+    menu(doc, 'year').click(); assert.equal(current(), '暗黑 第三季 2020');
+    menu(doc, 'season').click(); assert.equal(current(), '暗黑 2020');
+    menu(doc, 'year').click(); assert.equal(current(), '暗黑');
+    menu(doc, 'season').click(); assert.equal(current(), '暗黑 第三季');
+    menu(doc, 'year').click();
+    assert.match(decodeURIComponent(doc.querySelector('.zcw-soquark-btn').href), /暗黑 第三季 2020/);
+    assert.match(decodeURIComponent(doc.querySelector('.zcw-search-btn').href), /暗黑 第三季 2020/);
+});
+test('无年份季数禁用开关，不提取评论年份；英文季数可切换', async t => {
+    const { doc } = await boot(t, page(item(1, 8, null, 'Spider-Man') + '<div>评论：2023年看过</div>'));
+    assert.equal(menu(doc, 'year').disabled, true); assert.equal(menu(doc, 'season').disabled, true);
+    const b = await boot(t, page(item(1, 8, 2020, 'Dark Season 3')));
+    menu(b.doc, 'season').click();
+    assert.equal(new URL(b.doc.querySelector('.zcw-bilibili-btn').href).searchParams.get('keyword'), 'Dark');
+    menu(b.doc, 'season').click();
+    assert.equal(new URL(b.doc.querySelector('.zcw-bilibili-btn').href).searchParams.get('keyword'), 'Dark Season 3');
 });
 
-test('中创清洗后空词不能应用为当前页链接', async t => {
-    const { doc } = await boot(t);
-    const before = doc.querySelector('.zcw-search-btn').href;
-    doc.querySelector('.zcw-keyword-edit').click();
-    doc.querySelector('.zcw-keyword-editor input').value = 'Re:';
-    doc.querySelector('.zcw-keyword-apply').click();
-    assert.equal(doc.querySelector('.zcw-search-btn').href, before);
-    assert.ok(doc.querySelector('.zcw-keyword-editor'));
-    assert.match(doc.querySelector('.zcw-keyword-editor').textContent, /有效片名|无法/);
+test('列表简介首个上映日期也能提取年份，不使用收藏日期', async t => {
+    const html = page(item(1, 8, null, '头号玩家')).replace('<div class="abstract">年份: 未知</div>', '<div class="intro">2018-03-11(电影节) / 2018-03-30(中国大陆) / 演员</div><span class="date">2024-01-01</span>');
+    const { doc } = await boot(t, html);
+    assert.equal(menu(doc, 'year').disabled, false); menu(doc, 'year').click();
+    assert.equal(new URL(doc.querySelector('.zcw-bilibili-btn').href).searchParams.get('keyword'), '头号玩家 2018');
 });
-
-test('英文别名在em外时仍可切换，纯中文影片禁用英文切换', async t => {
-    const { doc } = await boot(t, page(item(1, 8, 2000, '<em>你的名字。</em> / Your Name')));
-    doc.querySelector('.zcw-keyword-edit').click();
-    const english = doc.querySelector('[data-language=english]');
-    assert.equal(english.disabled, false); english.click();
-    assert.equal(doc.querySelector('.zcw-keyword-editor input').value, 'Your Name');
-    const b = await boot(t, page(item(2, 8, 2000, '流浪地球')));
-    b.doc.querySelector('.zcw-keyword-edit').click();
-    assert.equal(b.doc.querySelector('[data-language=english]').disabled, true);
-});
-
-test('英文在前或含正式斜杠的英文名可完整切换', async t => {
-    for (const [raw, expected] of [['The Thing 怪形前传', 'The Thing'], ['变脸 Face/Off', 'Face/Off'], ['Face/Off / 变脸', 'Face/Off']]) {
-        const { doc } = await boot(t, page(item(1, 8, 2000, raw)));
-        doc.querySelector('.zcw-keyword-edit').click();
-        const english = doc.querySelector('[data-language=english]');
-        assert.equal(english.disabled, false, raw); english.click();
-        assert.equal(doc.querySelector('.zcw-keyword-editor input').value, expected, raw);
-    }
-});
-
-test('输入法合成中的Enter不提交', async t => {
-    const { doc, win } = await boot(t);
-    doc.querySelector('.zcw-keyword-edit').click();
-    const input = doc.querySelector('.zcw-keyword-editor input');
-    input.dispatchEvent(new win.KeyboardEvent('keydown', { key: 'Enter', isComposing: true, bubbles: true }));
-    assert.ok(doc.querySelector('.zcw-keyword-editor'), '输入法选字期间不关闭');
-    doc.querySelector('.zcw-keyword-cancel').click();
-});
-
 test('Space重复keydown不重复开页', async t => {
     const { doc, win, tabs } = await boot(t);
     const link = doc.querySelector('.zcw-soquark-btn');
