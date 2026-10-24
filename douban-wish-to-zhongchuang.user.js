@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         豆瓣想看 → 搜中创
 // @namespace    https://github.com/local/douban-zhongchuang
-// @version      2.14.0
+// @version      2.14.1
 // @description  豆瓣三站快捷搜索（中文/英文/自定义关键词）；片单评分与年份组合筛选、全量排序及失败续载。无需本地数据存储。
 // @author       Senior Developer
 // @match        https://movie.douban.com/*
@@ -46,12 +46,15 @@
         text-decoration:none!important;white-space:nowrap;vertical-align:middle;
         border:1px solid;border-radius:4px;cursor:pointer;appearance:none;user-select:none;
     }
-    .zcw-search-btn{color:#fff;background:#197cff;border-color:#1567d6}
+    .zcw-search-btn{color:#fff!important;background:#197cff;border-color:#1567d6}
     .zcw-search-btn:hover{color:#fff!important;background:#1567d6}
-    .zcw-bilibili-btn{color:#b8325c;border-color:#b8325c;background:transparent}
-    .zcw-bilibili-btn:hover{background:rgba(251,114,153,.12)}
-    .zcw-soquark-btn{color:#087f70;border-color:#087f70;background:transparent}
-    .zcw-soquark-btn:hover{background:rgba(8,127,112,.12)}
+    /* 注入按钮要覆盖豆瓣.title a:link/:visited的原生蓝色，实底保证独立对比度。 */
+    .zcw-bilibili-btn{color:#fff!important;border-color:#b8325c!important;background:#b8325c!important}
+    .zcw-bilibili-btn:hover,.zcw-bilibili-btn:focus-visible{background:#a0254c!important;border-color:#a0254c!important}
+    .zcw-bilibili-btn:active{background:#8c1f42!important}
+    .zcw-soquark-btn{color:#fff!important;border-color:#087f70!important;background:#087f70!important}
+    .zcw-soquark-btn:hover,.zcw-soquark-btn:focus-visible{background:#06695e!important;border-color:#06695e!important}
+    .zcw-soquark-btn:active{background:#05594f!important}
     .zcw-group>a::after,.zcw-group>button::after{content:none!important}
     .zcw-group>a:focus-visible,.zcw-group>button:focus-visible{outline:2px solid #197cff;outline-offset:2px}
     .zcw-keyword-edit{margin-left:8px;padding:1px 5px;font:inherit;font-size:12px;color:#666;border:0;border-bottom:1px dotted #999;background:transparent;cursor:pointer}
@@ -66,12 +69,14 @@
     .zcw-keyword-editor :focus-visible{outline:2px solid #197cff;outline-offset:2px}
     [data-zcw-filter-hidden]{display:none!important}
     @media(prefers-color-scheme:dark){
-        .zcw-search-btn{color:#0f1720;background:#8abde1;border-color:#8abde1}
+        .zcw-search-btn{color:#0f1720!important;background:#8abde1;border-color:#8abde1}
         .zcw-search-btn:hover{color:#0f1720!important;background:#9ccce9}
-        .zcw-bilibili-btn{color:#ffb2c8;border-color:#ffb2c8;background:#482631}
-        .zcw-bilibili-btn:hover{background:#663545}
-        .zcw-soquark-btn{color:#71dac3;border-color:#71dac3;background:#18382f}
-        .zcw-soquark-btn:hover{background:#214b3f}
+        .zcw-bilibili-btn{color:#ffe0e9!important;border-color:#cc718d!important;background:#482631!important}
+        .zcw-bilibili-btn:hover,.zcw-bilibili-btn:focus-visible{background:#663545!important;border-color:#e89ab1!important}
+        .zcw-bilibili-btn:active{background:#763e50!important}
+        .zcw-soquark-btn{color:#baf6e7!important;border-color:#71dac3!important;background:#18382f!important}
+        .zcw-soquark-btn:hover,.zcw-soquark-btn:focus-visible{background:#214b3f!important;border-color:#9aecd9!important}
+        .zcw-soquark-btn:active{background:#285b4c!important}
         .zcw-keyword-edit{color:#ccc}
         .zcw-keyword-editor{background:#252525;color:#eee;border-color:#666}
         .zcw-keyword-editor small{color:#bbb}
