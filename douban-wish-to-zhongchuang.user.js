@@ -1,8 +1,8 @@
 // ==UserScript==
 // @name         豆瓣想看 → 搜中创
 // @namespace    https://github.com/local/douban-zhongchuang
-// @version      2.17.0
-// @description  豆瓣电影关系图谱、三站搜索、IMDb/TMDB及自定义站点；复制片名、年份季数开关、片单筛选排序与失败续载。仅保存自定义站点设置。
+// @version      2.17.1
+// @description  豆瓣三站搜索、IMDb/TMDB及自定义搜索站点；复制片名、年份季数开关、片单筛选排序与失败续载。仅保存自定义站点设置。
 // @author       Senior Developer
 // @match        https://movie.douban.com/*
 // @match        https://www.douban.com/doulist/*
@@ -11,9 +11,6 @@
 // @grant        GM_openInTab
 // @grant        GM_getValue
 // @grant        GM_setValue
-// @grant        GM_xmlhttpRequest
-// @connect      movie.douban.com
-// @connect      www.douban.com
 // @updateURL    https://raw.githubusercontent.com/kakaSheepA/douban-search-tools/main/douban-wish-to-zhongchuang.user.js
 // @downloadURL  https://raw.githubusercontent.com/kakaSheepA/douban-search-tools/main/douban-wish-to-zhongchuang.user.js
 // @run-at       document-idle
@@ -85,50 +82,6 @@
     .zcw-site-row button{padding:4px 7px;margin-right:0}
     .zcw-site-settings [role=alert]{color:#b42318}
     .zcw-site-footer{margin-top:12px}
-    .zcw-graph{--g-bg:#f4f7fc;--g-panel:#fff;--g-text:#1e293b;--g-muted:#52647b;--g-line:#c7d3e3;position:fixed;inset:0;z-index:2147483647;display:flex;flex-direction:column;box-sizing:border-box;height:100vh;height:100dvh;color:var(--g-text);background:var(--g-bg);font:14px/1.5 Arial,sans-serif;text-align:left}
-    .zcw-graph *{box-sizing:border-box}
-    .zcw-graph button{font:inherit;color:var(--g-text);background:var(--g-panel);border:1px solid var(--g-line);border-radius:7px;padding:7px 12px;cursor:pointer}
-    .zcw-graph button:disabled{opacity:.55;cursor:default}
-    .zcw-graph button:hover:not(:disabled){border-color:#3267d6;background:var(--g-bg)}
-    .zcw-graph a{color:#245ec7!important;background:transparent!important;text-decoration:none!important;overflow-wrap:anywhere}
-    .zcw-graph a:hover{text-decoration:underline!important}
-    .zcw-graph :focus-visible{outline:2px solid #3267d6;outline-offset:2px}
-    .zcw-graph-header{display:flex;align-items:center;justify-content:space-between;gap:12px;padding:16px 24px;background:var(--g-panel);border-bottom:1px solid var(--g-line);flex:none}
-    .zcw-graph-header strong{font-size:21px;letter-spacing:.5px}
-    .zcw-graph-header small{display:block;font-size:12px;color:var(--g-muted);margin-top:3px}
-    .zcw-graph-body{display:grid;grid-template-columns:minmax(0,1fr) 300px;flex:1;min-height:0;overflow:hidden}
-    .zcw-graph-canvas{position:relative;min-height:0;min-width:0;overflow:hidden;background:radial-gradient(circle,var(--g-line) .7px,transparent .8px) 0 0/22px 22px}
-    .zcw-graph-tools{position:absolute;top:12px;left:16px;right:16px;z-index:1;display:flex;align-items:center;gap:6px;flex-wrap:wrap;color:#245ec7;font-size:12px}
-    .zcw-graph-tools>span{margin-right:auto;background:var(--g-panel);padding:6px 10px;border-radius:7px}
-    .zcw-graph-tools button{padding:5px 10px}
-    .zcw-graph-person-legend{color:#8a418d}
-    .zcw-graph-svg{display:block;width:100%;height:100%;min-height:260px;touch-action:none;cursor:grab}
-    .zcw-graph-svg:active{cursor:grabbing}
-    .zcw-graph-edge{stroke:var(--g-line);stroke-width:2}
-    .zcw-graph-edge.is-active{stroke:#7095cf;stroke-width:2.5}
-    .zcw-graph-edge-label{fill:var(--g-muted);font-size:12px;paint-order:stroke;stroke:var(--g-bg);stroke-width:5px;stroke-linejoin:round}
-    .zcw-graph-node{cursor:pointer}
-    .zcw-graph-node circle{fill:#e0eaff;stroke:#3267d6;stroke-width:2}
-    .zcw-graph-node.person circle{fill:#f2dff4;stroke:#98509b}
-    .zcw-graph-node.is-selected circle{stroke-width:5;filter:drop-shadow(0 3px 7px #3267d644)}
-    .zcw-graph-symbol{fill:#245ec7;font-size:19px;font-weight:bold;pointer-events:none}
-    .zcw-graph-node.person .zcw-graph-symbol{fill:#8a418d}
-    .zcw-graph-name{fill:var(--g-text);font-size:15px;font-weight:600;paint-order:stroke;stroke:var(--g-bg);stroke-width:4px;stroke-linejoin:round}
-    .zcw-graph-help{position:absolute;left:12px;bottom:8px;max-width:calc(100% - 24px);padding:5px 9px;margin:0;color:var(--g-muted);background:var(--g-panel);border-radius:5px;font-size:11px;pointer-events:none}
-    .zcw-graph-side{background:var(--g-panel);border-left:1px solid var(--g-line);padding:18px;overflow:auto;min-height:0}
-    .zcw-graph-detail h2{margin:4px 0 12px;font-size:21px;line-height:1.4;overflow-wrap:anywhere}
-    .zcw-graph-kind{color:var(--g-muted);font-size:12px}
-    .zcw-graph-source{display:block;margin-top:12px;font-size:12px}
-    .zcw-graph-relations{list-style:none;padding:0;margin:16px 0;font-size:12px;max-height:170px;overflow:auto}
-    .zcw-graph-relations li{padding:5px 0;border-bottom:1px solid var(--g-line)}
-    .zcw-graph summary{padding:10px 0;color:var(--g-muted);cursor:pointer;font-size:12px}
-    .zcw-graph-list{display:flex;flex-direction:column;gap:5px}
-    .zcw-graph-list button{text-align:left;font-size:12px;overflow-wrap:anywhere}
-    .zcw-graph-list button[aria-pressed=true]{border-color:#3267d6;background:var(--g-bg);font-weight:bold}
-    .zcw-graph footer{flex:none;border-top:1px solid var(--g-line);background:var(--g-panel);padding:10px 24px}
-    .zcw-graph-status{font-size:13px;min-height:20px}
-    .zcw-graph-note{color:var(--g-muted);font-size:11px;margin-top:3px}
-    @media(max-width:700px){.zcw-graph-header{padding:12px}.zcw-graph-header strong{font-size:18px}.zcw-graph-header small{font-size:10px}.zcw-graph-body{grid-template-columns:1fr;grid-template-rows:minmax(260px,1.15fr) minmax(150px,.85fr);overflow:auto}.zcw-graph-side{border-left:0;border-top:1px solid var(--g-line);padding:12px}.zcw-graph footer{padding:8px 12px}.zcw-graph-tools{left:8px;right:8px;top:8px}.zcw-graph-help{font-size:10px}.zcw-graph-canvas{min-height:260px}}
     [data-zcw-filter-hidden]{display:none!important}
     @media(prefers-color-scheme:dark){
         .zcw-search-btn{color:#0f1720!important;background:#8abde1;border-color:#8abde1}
@@ -147,14 +100,6 @@
         .zcw-site-settings{background:#202b3b;color:#f1f5f9}
         .zcw-site-settings button{background:#334155;color:#f1f5f9}
         .zcw-site-settings [role=alert]{color:#ffb4ab}
-        .zcw-graph{--g-bg:#111c2e;--g-panel:#1c2a40;--g-text:#e6edf8;--g-muted:#acbdd6;--g-line:#3c506e}
-        .zcw-graph a{color:#a9caff!important}
-        .zcw-graph-tools{color:#a9caff}
-        .zcw-graph-person-legend{color:#e5b7e8}
-        .zcw-graph-node circle{fill:#203e70;stroke:#8bb8ff}
-        .zcw-graph-node.person circle{fill:#513054;stroke:#e1a9e6}
-        .zcw-graph-symbol{fill:#c5daff}
-        .zcw-graph-node.person .zcw-graph-symbol{fill:#f4d5f6}
     }`;
     function injectStyle() {
         if (document.getElementById('zcw-style')) return;
@@ -425,261 +370,6 @@
         return link;
     }
 
-    const MovieGraph = (() => {
-        const MAX_NODES = 80, NS = 'http://www.w3.org/2000/svg';
-        let active = null;
-        const text = value => String(value || '').replace(/\s+/g, ' ').trim().slice(0, 100);
-        function normalizeUrl(value, base = location.href) {
-            try {
-                const u = new URL(value, base);
-                if (!/^https?:$/.test(u.protocol) || u.username || u.password) return null;
-                let m;
-                if (u.hostname === 'movie.douban.com' && (m = /^\/subject\/(\d+)\/?$/.exec(u.pathname))) return { id: 'movie:' + m[1], type: 'movie', url: 'https://movie.douban.com/subject/' + m[1] + '/' };
-                if (u.hostname === 'movie.douban.com' && (m = /^\/celebrity\/(\d+)(?:\/(movies))?\/?$/.exec(u.pathname))) return { id: 'person:celebrity:' + m[1], type: 'person', works: !!m[2], url: 'https://movie.douban.com/celebrity/' + m[1] + (m[2] ? '/movies' : '/') };
-                if (u.hostname === 'www.douban.com' && (m = /^\/personage\/(\d+)(?:\/(creations))?\/?$/.exec(u.pathname))) return { id: 'person:personage:' + m[1], type: 'person', works: !!m[2], url: 'https://www.douban.com/personage/' + m[1] + (m[2] ? '/creations' : '/') };
-            } catch (_) { /* 不支持的链接不会请求 */ }
-            return null;
-        }
-        function pageTitle(doc) { return text(doc.querySelector('h1 [property="v:itemreviewed"]')?.textContent || doc.querySelector('#content h1,h1')?.textContent); }
-        function parseMovie(doc, url) {
-            const root = normalizeUrl(url), title = pageTitle(doc);
-            if (!root || root.type !== 'movie' || !title || !doc.querySelector('#info,#recommendations,#celebrities')) throw Error('未找到影片资料，页面可能需要登录或验证');
-            const node = { ...root, title: resolveSearchTitle(title) || title }, nodes = new Map([[root.id, node]]), edges = [];
-            const add = (a, relation, type) => {
-                const target = normalizeUrl(a.getAttribute('href'), url);
-                const title = text(a.textContent || a.getAttribute('title') || a.querySelector('img')?.alt);
-                if (!target || target.type !== type || !title || target.id === root.id) return;
-                nodes.set(target.id, { ...target, title });
-                if (!edges.some(e => e.target === target.id && e.relation === relation)) edges.push({ source: root.id, target: target.id, relation, url: root.url });
-            };
-            const info = doc.querySelector('#info');
-            if (info) {
-                info.querySelectorAll('a[rel="v:directedBy"]').forEach(a => add(a, '导演', 'person'));
-                [...info.querySelectorAll('a[rel="v:starring"]')].slice(0, 8).forEach(a => add(a, '主演', 'person'));
-                for (const span of info.querySelectorAll('span')) {
-                    const label = text(span.querySelector('.pl')?.textContent).replace(/[:：]$/, '');
-                    if (label === '导演' || label === '主演') [...span.querySelectorAll('a[href]')].slice(0, label === '主演' ? 8 : 4).forEach(a => add(a, label, 'person'));
-                }
-            }
-            [...doc.querySelectorAll('#celebrities .celebrity')].slice(0, 12).forEach(card => {
-                const a = card.querySelector('.name a[href],a.name[href]');
-                const role = text(card.querySelector('.role')?.textContent);
-                if (a && /导演|演员|饰/.test(role)) add(a, /导演/.test(role) ? '导演' : '主演', 'person');
-            });
-            [...doc.querySelectorAll('#recommendations dl')].slice(0, 8).forEach(dl => { const a = dl.querySelector('dd a[href],dt a[href]'); if (a) add(a, '豆瓣推荐', 'movie'); });
-            return { nodes: [...nodes.values()], edges };
-        }
-        function parsePerson(doc, url) {
-            const root = normalizeUrl(url), title = pageTitle(doc);
-            if (!root || root.type !== 'person' || !title) throw Error('未找到人物资料，页面可能需要登录或验证');
-            const nodes = new Map([[root.id, { ...root, title }]]), edges = [];
-            const area = root.works ? doc.querySelector('#content .article,#content') : doc.querySelector('#recent_movies,.works-list,.creations,.list-view,.grid_view');
-            if (area) for (const a of area.querySelectorAll('a[href]')) {
-                if (a.closest('.aside,.comment,.comments,.recommendations,blockquote')) continue;
-                const target = normalizeUrl(a.getAttribute('href'), url);
-                const title = text(a.getAttribute('title') || a.querySelector('img')?.alt || a.textContent);
-                if (!target || target.type !== 'movie' || !title || nodes.has(target.id)) continue;
-                nodes.set(target.id, { ...target, title: resolveSearchTitle(title) || title });
-                edges.push({ source: root.id, target: target.id, relation: '人物页作品', url: root.url });
-            }
-            let worksUrl = '';
-            if (!root.works && !edges.length) for (const a of doc.querySelectorAll('#content a[href]')) {
-                const target = normalizeUrl(a.getAttribute('href'), url);
-                if (target?.id === root.id && target.works) { worksUrl = target.url; break; }
-            }
-            if (!root.works && !edges.length && !worksUrl && root.id.startsWith('person:celebrity:')) worksUrl = root.url.replace(/\/$/, '') + '/movies';
-            return { nodes: [...nodes.values()], edges, worksUrl };
-        }
-        function fetchPage(s, url) {
-            const expected = normalizeUrl(url);
-            if (!expected) return Promise.reject(Error('不支持的关系页面地址'));
-            return new Promise((resolve, reject) => {
-                if (typeof GM_xmlhttpRequest !== 'function') { reject(Error('请更新油猴脚本并确认读取豆瓣关系页面的权限')); return; }
-                let done = false;
-                const finish = (error, doc) => {
-                    if (done) return; done = true; s.cancel = null;
-                    if (error) reject(error); else resolve(doc);
-                };
-                const request = GM_xmlhttpRequest({ method: 'GET', url: expected.url, timeout: 20000,
-                    onload: response => {
-                        const final = normalizeUrl(response.finalUrl || expected.url);
-                        if (!final || final.id !== expected.id || final.works !== expected.works) { finish(Error('豆瓣返回验证或跳转页面，请在原页面处理后重试')); return; }
-                        if (response.status !== 200) { finish(Error('豆瓣页面读取失败（HTTP ' + response.status + '）')); return; }
-                        const html = response.responseText;
-                        if (typeof html !== 'string' || html.length > 2500000) { finish(Error('页面内容无效或过大')); return; }
-                        const doc = new DOMParser().parseFromString(html, 'text/html');
-                        if (doc.querySelector('form[action*="captcha"],input[name=captcha-solution],#captcha_image') || /验证|验证码|captcha/i.test(doc.title)) { finish(Error('豆瓣需要验证，请打开原页面处理后再重试')); return; }
-                        finish(null, doc);
-                    },
-                    onerror: () => finish(Error('网络读取失败，可打开原页面检查后重试')),
-                    ontimeout: () => finish(Error('读取超时，可点击展开重试')),
-                    onabort: () => finish(Error('已取消加载')),
-                });
-                if (!done) s.cancel = () => { finish(Error('已取消加载')); request?.abort(); };
-            });
-        }
-        function merge(s, data) {
-            for (const node of data.nodes) {
-                if (!s.nodes.has(node.id) && s.nodes.size >= MAX_NODES) { s.limited = true; continue; }
-                if (!s.nodes.has(node.id)) s.nodes.set(node.id, node);
-            }
-            for (const edge of data.edges) {
-                const key = edge.source + '|' + edge.target + '|' + edge.relation;
-                if (s.nodes.has(edge.source) && s.nodes.has(edge.target) && !s.edges.has(key)) s.edges.set(key, edge);
-            }
-        }
-        async function expand(s) {
-            if (active !== s || s.busy) return;
-            const node = s.nodes.get(s.selected);
-            if (s.expanded.has(node.id)) { s.message = '已展示该节点的本页可用关系'; render(s); return; }
-            if (s.nodes.size >= MAX_NODES) { s.limited = true; render(s); return; }
-            s.busy = true; s.message = '正在读取「' + node.title + '」的关系…'; render(s);
-            let changed = false;
-            try {
-                let doc;
-                const here = normalizeUrl(location.href);
-                if (node.type === 'movie' && here?.id === node.id && document.querySelector('#info,#recommendations,#celebrities')) doc = document;
-                else doc = await fetchPage(s, node.url);
-                if (active !== s) return;
-                let data = node.type === 'movie' ? parseMovie(doc, node.url) : parsePerson(doc, node.url);
-                if (data.worksUrl) { const worksDoc = await fetchPage(s, data.worksUrl); if (active !== s) return; data = parsePerson(worksDoc, data.worksUrl); }
-                const previousSize = s.nodes.size;
-                merge(s, data); s.expanded.add(node.id); changed = s.nodes.size !== previousSize;
-                s.message = data.edges.length ? '已展开「' + node.title + '」，新增或合并 ' + data.edges.length + ' 条来源关系' : '该页面未提供可识别的关系，可打开原页面查看';
-            } catch (e) { if (active === s) s.message = e.message; }
-            finally { if (active === s) { s.busy = false; render(s); if (changed) fit(s, true); } }
-        }
-        function svgElement(tag, attrs, content) {
-            const el = document.createElementNS(NS, tag);
-            for (const [key, value] of Object.entries(attrs)) el.setAttribute(key, value);
-            if (content !== undefined) el.textContent = content;
-            return el;
-        }
-        function positions(s) {
-            const distance = new Map([[s.root, 0]]), queue = [s.root];
-            for (let i = 0; i < queue.length; i++) for (const e of s.edges.values()) {
-                const other = e.source === queue[i] ? e.target : e.target === queue[i] ? e.source : null;
-                if (other && !distance.has(other)) { distance.set(other, distance.get(queue[i]) + 1); queue.push(other); }
-            }
-            const layers = new Map(), points = new Map([[s.root, { x: 0, y: 0 }]]);
-            for (const id of s.nodes.keys()) if (id !== s.root) { const d = distance.get(id) || 1; if (!layers.has(d)) layers.set(d, []); layers.get(d).push(id); }
-            for (const [d, ids] of layers) ids.forEach((id, i) => {
-                const angle = i / ids.length * Math.PI * 2 - Math.PI / 2;
-                const radius = Math.max(d * 180, ids.length * 24);
-                points.set(id, { x: Math.cos(angle) * radius, y: Math.sin(angle) * radius });
-            });
-            return points;
-        }
-        function applyView(s) {
-            s.width = s.svg.clientWidth || 1000; s.height = s.svg.clientHeight || 700;
-            s.svg.setAttribute('viewBox', '0 0 ' + s.width + ' ' + s.height);
-            s.world.setAttribute('transform', 'translate(' + s.view.x + ',' + s.view.y + ') scale(' + s.view.scale + ')');
-        }
-        function fit(s, readable = false) {
-            const points = positions(s), pts = [...points.values()], extent = Math.max(180, ...pts.map(p => Math.max(Math.abs(p.x), Math.abs(p.y)) + 85));
-            const width = s.svg.clientWidth || 1000, height = s.svg.clientHeight || 700;
-            const scale = Math.max(readable ? .8 : .12, Math.min(1, (Math.min(width, height) - 80) / (extent * 2)));
-            const center = readable ? points.get(s.selected) : { x: 0, y: 0 };
-            s.view = { x: width / 2 - center.x * scale, y: height / 2 - center.y * scale, scale }; applyView(s);
-        }
-        function select(s, id) { if (s.busy) return; s.selected = id; render(s); }
-        function render(s) {
-            if (active !== s) return;
-            const focusedNode = document.activeElement?.dataset.graphNode;
-            const pts = positions(s), selected = s.nodes.get(s.selected);
-            s.edgeLayer.replaceChildren();
-            const visualEdges = new Map();
-            for (const edge of s.edges.values()) {
-                const pair = [edge.source, edge.target].sort().join('|');
-                if (!visualEdges.has(pair)) visualEdges.set(pair, { ...edge, labels: new Set() });
-                visualEdges.get(pair).labels.add(edge.relation);
-            }
-            for (const edge of visualEdges.values()) {
-                const from = pts.get(edge.source), to = pts.get(edge.target);
-                const relevant = edge.source === s.selected || edge.target === s.selected;
-                s.edgeLayer.appendChild(svgElement('line', { x1: from.x, y1: from.y, x2: to.x, y2: to.y, class: 'zcw-graph-edge' + (relevant ? ' is-active' : '') }));
-                if (relevant) s.edgeLayer.appendChild(svgElement('text', { x: (from.x + to.x) / 2, y: (from.y + to.y) / 2 - 6, class: 'zcw-graph-edge-label', 'text-anchor': 'middle' }, [...edge.labels].join(' / ')));
-            }
-            for (const node of s.nodes.values()) {
-                const p = pts.get(node.id);
-                let g = s.nodeViews.get(node.id);
-                if (!g) {
-                    g = svgElement('g', { role: 'button', tabindex: '-1', 'aria-label': node.title });
-                    g.append(svgElement('circle', { r: node.id === s.root ? 38 : 29 }), svgElement('text', { y: 5, 'text-anchor': 'middle', class: 'zcw-graph-symbol' }, node.type === 'movie' ? '影' : '人'), svgElement('text', { y: 57, 'text-anchor': 'middle', class: 'zcw-graph-name' }, node.title.length > 14 ? node.title.slice(0, 13) + '…' : node.title));
-                    g.appendChild(svgElement('title', {}, node.title));
-                    g.addEventListener('click', () => select(s, node.id));
-                    g.addEventListener('dblclick', () => { if (!s.busy) { s.selected = node.id; expand(s); } });
-                    s.nodeViews.set(node.id, g); s.nodeLayer.appendChild(g);
-                }
-                g.setAttribute('transform', 'translate(' + p.x + ',' + p.y + ')');
-                g.setAttribute('class', 'zcw-graph-node ' + node.type + (node.id === s.selected ? ' is-selected' : ''));
-            }
-            s.list.replaceChildren();
-            for (const node of s.nodes.values()) {
-                const b = document.createElement('button'); b.type = 'button'; b.dataset.graphNode = node.id;
-                b.textContent = (node.type === 'movie' ? '影片 · ' : '人物 · ') + node.title;
-                b.setAttribute('aria-pressed', String(node.id === s.selected));
-                b.disabled = s.busy; b.addEventListener('click', () => select(s, node.id)); s.list.appendChild(b);
-            }
-            if (focusedNode && !s.busy) [...s.list.children].find(b => b.dataset.graphNode === focusedNode)?.focus();
-            s.detailTitle.textContent = selected.title;
-            s.detailKind.textContent = selected.type === 'movie' ? '影片节点' : '人物节点';
-            s.detailSource.href = selected.url; s.detailSource.textContent = '打开豆瓣原页面 ↗';
-            s.detailRelations.replaceChildren();
-            for (const e of s.edges.values()) if (e.source === selected.id || e.target === selected.id) {
-                const other = s.nodes.get(e.source === selected.id ? e.target : e.source);
-                const li = document.createElement('li'), a = document.createElement('a');
-                a.href = e.url; a.target = '_blank'; a.rel = 'noopener noreferrer'; a.textContent = e.relation + ' · ' + other.title;
-                a.title = '关系来源：' + e.url; li.appendChild(a); s.detailRelations.appendChild(li);
-            }
-            s.expand.disabled = s.busy || s.expanded.has(selected.id) || s.nodes.size >= MAX_NODES;
-            s.expand.textContent = s.busy ? '读取中…' : s.expanded.has(selected.id) ? '已展开' : '展开关系';
-            s.status.textContent = s.message;
-            s.note.textContent = s.nodes.size + ' 个节点 · ' + s.edges.size + ' 条关系。' + (s.limited ? '已到容量上限，最多80个节点。' : '最多80个节点，每部优先展示8位主演和8部豆瓣推荐。') + '“豆瓣推荐”不代表续作；“人物页作品”不推断具体职务。';
-            applyView(s);
-        }
-        function close() {
-            const s = active; if (!s) return; active = null;
-            s.cancel?.(); document.removeEventListener('keydown', s.onKey); window.removeEventListener('resize', s.onResize); document.body.style.overflow = s.previousOverflow;
-            s.modal.remove(); if (s.origin.isConnected) s.origin.focus();
-        }
-        function open(context, origin) {
-            closeMoreMenu(); close();
-            const root = normalizeUrl('https://movie.douban.com/subject/' + context.doubanId + '/');
-            if (!root) return;
-            const modal = document.createElement('div'); modal.className = 'zcw-graph'; modal.setAttribute('role', 'dialog'); modal.setAttribute('aria-modal', 'true'); modal.setAttribute('aria-label', '电影关系图谱');
-            modal.innerHTML = '<header class="zcw-graph-header"><div><strong>电影关系图谱</strong><small>从一部电影，探索它与人和作品的联系</small></div><button type="button" class="zcw-graph-close" aria-label="关闭关系图谱">关闭 ×</button></header><div class="zcw-graph-body"><section class="zcw-graph-canvas"><div class="zcw-graph-tools"><span>● 影片　<span class="zcw-graph-person-legend">● 人物</span></span><button type="button" data-graph-tool="in" aria-label="放大">＋</button><button type="button" data-graph-tool="out" aria-label="缩小">−</button><button type="button" data-graph-tool="fit">适应画布</button></div><svg class="zcw-graph-svg" viewBox="0 0 1000 700" aria-label="电影关系网络"></svg><p class="zcw-graph-help">拖动画布 · 滚轮缩放 · 点击节点查看 · 双击节点展开</p></section><aside class="zcw-graph-side"><div class="zcw-graph-detail"><small class="zcw-graph-kind"></small><h2></h2><button type="button" class="zcw-graph-expand">展开关系</button><a class="zcw-graph-source" target="_blank" rel="noopener noreferrer"></a><ul class="zcw-graph-relations"></ul></div><details open><summary>节点列表 · 可用键盘选择</summary><div class="zcw-graph-list"></div></details></aside></div><footer><div class="zcw-graph-status" role="status" aria-live="polite"></div><div class="zcw-graph-note"></div></footer>';
-            const svg = modal.querySelector('svg'), world = svgElement('g', {}), edgeLayer = svgElement('g', {}), nodeLayer = svgElement('g', {}); world.append(edgeLayer, nodeLayer); svg.appendChild(world);
-            const s = { modal, svg, world, edgeLayer, nodeLayer, nodeViews: new Map(), origin, root: root.id, selected: root.id, nodes: new Map([[root.id, { ...root, title: context.title }]]), edges: new Map(), expanded: new Set(), busy: false, message: '', view: { x: 500, y: 350, scale: 1 }, previousOverflow: document.body.style.overflow,
-                list: modal.querySelector('.zcw-graph-list'), detailTitle: modal.querySelector('h2'), detailKind: modal.querySelector('.zcw-graph-kind'), detailSource: modal.querySelector('.zcw-graph-source'), detailRelations: modal.querySelector('.zcw-graph-relations'), expand: modal.querySelector('.zcw-graph-expand'), status: modal.querySelector('.zcw-graph-status'), note: modal.querySelector('.zcw-graph-note') };
-            active = s; document.body.appendChild(modal); document.body.style.overflow = 'hidden';
-            modal.querySelector('.zcw-graph-close').addEventListener('click', close);
-            s.expand.addEventListener('click', () => expand(s));
-            modal.querySelectorAll('[data-graph-tool]').forEach(b => b.addEventListener('click', () => {
-                if (b.dataset.graphTool === 'fit') fit(s);
-                else { s.view.scale = Math.max(.12, Math.min(2.5, s.view.scale * (b.dataset.graphTool === 'in' ? 1.25 : .8))); applyView(s); }
-            }));
-            svg.addEventListener('wheel', e => { e.preventDefault(); s.view.scale = Math.max(.12, Math.min(2.5, s.view.scale * (e.deltaY < 0 ? 1.1 : 1 / 1.1))); applyView(s); }, { passive: false });
-            let drag;
-            svg.addEventListener('pointerdown', e => { if (e.button !== 0 || e.target.closest('.zcw-graph-node')) return; drag = { x: e.clientX, y: e.clientY, vx: s.view.x, vy: s.view.y }; svg.setPointerCapture(e.pointerId); });
-            svg.addEventListener('pointermove', e => { if (!drag) return; s.view.x = drag.vx + e.clientX - drag.x; s.view.y = drag.vy + e.clientY - drag.y; applyView(s); });
-            svg.addEventListener('pointerup', () => { drag = null; }); svg.addEventListener('pointercancel', () => { drag = null; });
-            s.onKey = e => {
-                if (e.key === 'Escape' && !e.isComposing) { e.preventDefault(); e.stopPropagation(); close(); }
-                if (e.key === 'Tab') {
-                    const controls = [...modal.querySelectorAll('button:not(:disabled),a[href],summary')].filter(n => !n.closest('details:not([open])') || n.tagName === 'SUMMARY');
-                    if (e.shiftKey && document.activeElement === controls[0]) { e.preventDefault(); controls.at(-1)?.focus(); }
-                    else if (!e.shiftKey && document.activeElement === controls.at(-1)) { e.preventDefault(); controls[0]?.focus(); }
-                }
-            };
-            s.onResize = () => { if (active === s) { render(s); fit(s, true); } };
-            window.addEventListener('resize', s.onResize);
-            document.addEventListener('keydown', s.onKey); render(s); fit(s, true); modal.querySelector('.zcw-graph-close').focus();
-            expand(s);
-        }
-        return { open, close, normalizeUrl, parseMovie, parsePerson, snapshot: () => active ? { nodes: [...active.nodes.values()].map(n => ({ ...n })), edges: [...active.edges.values()].map(e => ({ ...e })) } : null };
-    })();
-
     const SITE_SETTINGS_KEY = 'zcw.searchSites.v1';
     let customSites = null, siteLoadError = '';
     function validateSite(site) {
@@ -874,7 +564,6 @@
         extra('zcw-imdb-link', context.ids.imdb ? 'IMDb · 查看条目' : 'IMDb · 搜索片名', title => context.ids.imdb ? 'https://www.imdb.com/title/' + context.ids.imdb + '/' : 'https://www.imdb.com/find/?q=' + encodeURIComponent(title) + '&s=tt');
         extra('zcw-tmdb-link', context.ids.tmdb ? 'TMDB · 查看条目' : 'TMDB · 搜索片名', title => context.ids.tmdb ? 'https://www.themoviedb.org/' + context.ids.tmdb : 'https://www.themoviedb.org/search?query=' + encodeURIComponent(title));
         for (const site of readSites().filter(s => s.enabled)) extra('zcw-custom-link', site.name, title => siteUrl(site, title));
-        add('graph', '电影关系图谱…', () => MovieGraph.open(context, origin), !context.doubanId);
         add('settings', '自定义搜索站点…', () => openSiteSettings(origin));
         if (siteLoadError) status.textContent = siteLoadError;
         element.appendChild(status); document.body.appendChild(element);
@@ -906,7 +595,7 @@
         if (!buildSearchUrl(resolved)) return null;
         const group = document.createElement('span'); group.className = 'zcw-group';
         const mainTitle = resolved.replace(SEASON_SUFFIX, '').trim() || resolved;
-        const context = { title: resolved, mainTitle, current: resolved, year, ids, doubanId, includeYear: false, includeSeason: true, links: [] };
+        const context = { title: resolved, mainTitle, current: resolved, year, ids, includeYear: false, includeSeason: true, links: [] };
         for (const [className, text, buildUrl] of [[BTN_CLASS, CONFIG.BUTTON_TEXT, buildSearchUrl], [BILIBILI_BTN_CLASS, CONFIG.BILIBILI_BUTTON_TEXT, buildBilibiliSearchUrl], [SOQUARK_BTN_CLASS, CONFIG.SOQUARK_BUTTON_TEXT, buildSoquarkSearchUrl]]) {
             const link = searchLink(resolved, className, text, buildUrl);
             if (doubanId) link.setAttribute('data-zcw-id', doubanId);
@@ -1393,7 +1082,7 @@
         else boot();
     }
     window.__ZCW__ = {
-        CONFIG, MovieGraph, DoulistSort, preferredSearchTitle, extractTitle, resolveSearchTitle,
+        CONFIG, DoulistSort, preferredSearchTitle, extractTitle, resolveSearchTitle,
         sanitizeSearchTitle, MAX_SEARCH_TITLE_CHARS, buildSearchUrl, buildBilibiliKeyword,
         buildBilibiliSearchUrl, buildSoquarkSearchUrl, BILIBILI_SEARCH_URL, SOQUARK_SEARCH_URL,
         ExternalSearchAction, createButton, createBilibiliButton, createSoquarkButton,
