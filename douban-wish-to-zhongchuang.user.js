@@ -1,14 +1,16 @@
 // ==UserScript==
 // @name         豆瓣想看 → 搜中创
 // @namespace    https://github.com/local/douban-zhongchuang
-// @version      2.13.0
-// @description  豆瓣影视页面三站快捷搜索（中创/B站/SoQuark），中文片名优先；影视片单全量按评分或年份排序。无需本地数据存储。
+// @version      2.14.0
+// @description  豆瓣三站快捷搜索（中文/英文/自定义关键词）；片单评分与年份组合筛选、全量排序及失败续载。无需本地数据存储。
 // @author       Senior Developer
 // @match        https://movie.douban.com/*
 // @match        https://www.douban.com/doulist/*
 // @match        https://douban.com/doulist/*
 // @icon         https://www.douban.com/favicon.ico
 // @grant        GM_openInTab
+// @updateURL    https://raw.githubusercontent.com/kakaSheepA/douban-search-tools/main/douban-wish-to-zhongchuang.user.js
+// @downloadURL  https://raw.githubusercontent.com/kakaSheepA/douban-search-tools/main/douban-wish-to-zhongchuang.user.js
 // @run-at       document-idle
 // @noframes
 // ==/UserScript==
@@ -52,6 +54,17 @@
     .zcw-soquark-btn:hover{background:rgba(8,127,112,.12)}
     .zcw-group>a::after,.zcw-group>button::after{content:none!important}
     .zcw-group>a:focus-visible,.zcw-group>button:focus-visible{outline:2px solid #197cff;outline-offset:2px}
+    .zcw-keyword-edit{margin-left:8px;padding:1px 5px;font:inherit;font-size:12px;color:#666;border:0;border-bottom:1px dotted #999;background:transparent;cursor:pointer}
+    .zcw-keyword-editor{position:fixed;z-index:2147483646;box-sizing:border-box;width:min(390px,calc(100vw - 24px));padding:16px;border:1px solid #bbb;border-radius:8px;background:#fff;color:#333;box-shadow:0 6px 28px #0003;font:13px/1.6 Arial,sans-serif}
+    .zcw-keyword-editor h3{margin:0 0 8px;font-size:15px}
+    .zcw-keyword-editor input{box-sizing:border-box;width:100%;padding:7px;margin:8px 0;font:inherit;color:inherit;background:transparent;border:1px solid #aaa;border-radius:4px}
+    .zcw-keyword-editor button{padding:4px 9px;margin:0 6px 6px 0;font:inherit;cursor:pointer;color:inherit;background:transparent;border:1px solid #aaa;border-radius:4px}
+    .zcw-keyword-editor button[aria-pressed=true]{color:#fff;background:#197cff;border-color:#197cff}
+    .zcw-keyword-editor button:disabled{opacity:.4;cursor:default}
+    .zcw-keyword-editor small{display:block;color:#777}
+    .zcw-keyword-editor [role=alert]{color:#b42318}
+    .zcw-keyword-editor :focus-visible{outline:2px solid #197cff;outline-offset:2px}
+    [data-zcw-filter-hidden]{display:none!important}
     @media(prefers-color-scheme:dark){
         .zcw-search-btn{color:#0f1720;background:#8abde1;border-color:#8abde1}
         .zcw-search-btn:hover{color:#0f1720!important;background:#9ccce9}
@@ -59,6 +72,10 @@
         .zcw-bilibili-btn:hover{background:#663545}
         .zcw-soquark-btn{color:#71dac3;border-color:#71dac3;background:#18382f}
         .zcw-soquark-btn:hover{background:#214b3f}
+        .zcw-keyword-edit{color:#ccc}
+        .zcw-keyword-editor{background:#252525;color:#eee;border-color:#666}
+        .zcw-keyword-editor small{color:#bbb}
+        .zcw-keyword-editor [role=alert]{color:#ffb4ab}
     }`;
     function injectStyle() {
         if (document.getElementById('zcw-style')) return;
@@ -175,8 +192,13 @@
         return s;
     }
 
-    function buildSearchUrl(title) {
-        const safe = sanitizeSearchTitle(preferredSearchTitle(title));
+    function searchKeyword(title, options) {
+        if (typeof title !== 'string') return '';
+        return options?.literal ? title.replace(/\s+/g, ' ').trim() : preferredSearchTitle(title);
+    }
+
+    function buildSearchUrl(title, options) {
+        const safe = sanitizeSearchTitle(searchKeyword(title, options));
         if (!safe) return '';
         let url = CONFIG.SEARCH_URL.replace('{q}', encodeURIComponent(safe));
         return url;
@@ -192,16 +214,16 @@
         return preferredSearchTitle(s);
     }
 
-    function buildBilibiliSearchUrl(title) {
-        const keyword = buildBilibiliKeyword(title);
+    function buildBilibiliSearchUrl(title, options) {
+        const keyword = searchKeyword(title, options);
         if (!keyword) return null;
         const u = new URL(BILIBILI_SEARCH_URL);
         u.searchParams.set('keyword', keyword);   // URL API 负责编码，不手动 encodeURIComponent
         return u.href;
     }
 
-    function buildSoquarkSearchUrl(title) {
-        const keyword = preferredSearchTitle(title);
+    function buildSoquarkSearchUrl(title, options) {
+        const keyword = searchKeyword(title, options);
         return keyword ? SOQUARK_SEARCH_URL + encodeURIComponent(keyword) + '.html' : null;
     }
 
@@ -302,49 +324,141 @@
     }
 
 
-    function createButton(title, doubanId) {
-        const resolved = resolveSearchTitle(title);
-        const url = buildSearchUrl(resolved);
+    function searchNames(title, raw = title) {
+        const preferred = resolveSearchTitle(title);
+        const chinese = HAS_CJK.test(preferred) && !/[\u3040-\u30ff]/.test(preferred) ? preferred : '';
+        // 只把别名分隔斜杠拆开，Face/Off等英文片名内部斜杠保留。
+        const separated = String(raw || '').replace(/\s*\/\s*/g, (slash, index, all) => {
+            const neighbors = (all[index - 1] || '') + (all[index + slash.length] || '');
+            return /\s/.test(slash) || /[\u4e00-\u9fa5\u3040-\u30ff]/.test(neighbors) ? '\n' : slash;
+        });
+        const parts = separated.split('\n').map(s => s.replace(/\s*[（(](?:\d{4}|港|台|豆瓣(?:电影)?)[）)]\s*$/, '').trim()).filter(Boolean);
+        const roman = s => /[a-z]/i.test(s) && !/[\u4e00-\u9fa5\u3040-\u30ff]/.test(s);
+        let english = !chinese && roman(preferred) ? preferred : parts.find(roman) || '';
+        if (!english) {
+            for (const part of parts) {
+                const chunks = part.split(/\s+/), groups = [];
+                let group = [];
+                for (const token of chunks) {
+                    if (/[\u4e00-\u9fa5\u3040-\u30ff]/.test(token)) {
+                        if (group.length) groups.push(group); group = [];
+                    } else group.push(token);
+                }
+                if (group.length) groups.push(group);
+                for (const words of groups) {
+                    while (words.length && /^(?:\d{4}|\d+[dDkK]|Re[:：])$/.test(words[0])) words.shift();
+                    const candidate = words.join(' ');
+                    if (roman(candidate) && !/^(?:Season|Part)\s+\d+$/i.test(candidate)) { english = candidate; break; }
+                }
+                if (english) break;
+            }
+        }
+        return { auto: preferred, chinese, english };
+    }
+
+    function searchLink(title, className, text, buildUrl) {
+        if (typeof title !== 'string' || !title.trim()) return null;
+        const resolved = resolveSearchTitle(title), url = buildUrl(resolved);
         if (!url) return null;
+        const link = document.createElement('a');
+        link.className = className; link.textContent = text;
+        link.href = url; link.target = '_blank'; link.rel = 'noopener noreferrer';
+        link.title = text + '：' + resolved; link.setAttribute('data-zcw-title', resolved);
+        link.addEventListener('click', e => {
+            e.stopPropagation();
+            if (e.button !== 0 || e.ctrlKey || e.metaKey || e.shiftKey || e.altKey) return;
+            e.preventDefault(); openSearchUrl(link.href);
+        });
+        link.addEventListener('auxclick', e => { if (e.button === 1) e.stopPropagation(); });
+        link.addEventListener('keydown', e => {
+            if (e.key === ' ' && !e.ctrlKey && !e.metaKey && !e.shiftKey && !e.altKey) {
+                e.preventDefault(); if (!e.repeat && !e.isComposing) link.click();
+            }
+        });
+        return link;
+    }
+
+    let keywordEditor = null;
+    function closeKeywordEditor() {
+        if (!keywordEditor) return;
+        const { element, onOutside, origin } = keywordEditor;
+        document.removeEventListener('click', onOutside);
+        element.remove(); keywordEditor = null;
+        if (origin.isConnected) origin.focus();
+    }
+
+    function openKeywordEditor(context, origin) {
+        closeKeywordEditor();
+        const element = document.createElement('div');
+        element.className = 'zcw-keyword-editor';
+        element.setAttribute('role', 'dialog'); element.setAttribute('aria-label', '编辑搜索关键词');
+        const heading = document.createElement('h3'); heading.textContent = '搜索关键词'; element.appendChild(heading);
+        const modes = document.createElement('div'); element.appendChild(modes);
+        const input = document.createElement('input'); input.type = 'text'; input.setAttribute('aria-label', '搜索关键词'); input.value = context.keyword;
+        const buttons = [];
+        for (const [mode, label] of [['auto', '自动'], ['chinese', '中文名'], ['english', '英文名']]) {
+            const button = document.createElement('button'); button.type = 'button'; button.textContent = label;
+            button.dataset.language = mode; button.disabled = !context.names[mode];
+            button.setAttribute('aria-pressed', String(context.mode === mode)); buttons.push(button);
+            button.addEventListener('click', () => { input.value = context.names[mode]; buttons.forEach(b => b.setAttribute('aria-pressed', String(b === button))); input.focus(); });
+            modes.appendChild(button);
+        }
+        element.appendChild(input);
+        input.addEventListener('input', () => buttons.forEach(b => b.setAttribute('aria-pressed', 'false')));
+        const hint = document.createElement('small'); hint.textContent = '只修改本条搜索词，刷新后恢复。中创仍最多18字。'; element.appendChild(hint);
+        const message = document.createElement('div'); message.setAttribute('role', 'alert'); element.appendChild(message);
+        const apply = document.createElement('button'); apply.type = 'button'; apply.className = 'zcw-keyword-apply'; apply.textContent = '应用';
+        const cancel = document.createElement('button'); cancel.type = 'button'; cancel.className = 'zcw-keyword-cancel'; cancel.textContent = '取消';
+        const commit = () => {
+            const keyword = searchKeyword(input.value, { literal: true });
+            if (!keyword) { message.textContent = '关键词不能为空'; input.focus(); return; }
+            const urls = context.links.map(({ buildUrl }) => buildUrl(keyword, { literal: true }));
+            if (urls.some(url => !url)) { message.textContent = '关键词无法用于中创搜索，请输入有效片名'; input.focus(); return; }
+            context.keyword = keyword;
+            context.mode = buttons.find(b => b.getAttribute('aria-pressed') === 'true')?.dataset.language || 'manual';
+            context.links.forEach(({ link }, index) => {
+                link.href = urls[index]; link.setAttribute('data-zcw-title', keyword);
+                link.title = link.textContent + '：' + keyword;
+            });
+            origin.title = '当前关键词：' + keyword;
+            closeKeywordEditor();
+        };
+        apply.addEventListener('click', commit); cancel.addEventListener('click', closeKeywordEditor);
+        element.addEventListener('keydown', e => {
+            if (e.isComposing || e.keyCode === 229) return;
+            if (e.key === 'Escape') { e.preventDefault(); closeKeywordEditor(); }
+            else if (e.key === 'Enter' && e.target === input) { e.preventDefault(); commit(); }
+        });
+        element.append(apply, cancel); document.body.appendChild(element);
+        const rect = origin.getBoundingClientRect();
+        element.style.left = Math.max(12, Math.min(rect.left, window.innerWidth - 402)) + 'px';
+        element.style.top = Math.max(12, Math.min(rect.bottom + 6, window.innerHeight - element.offsetHeight - 12)) + 'px';
+        const onOutside = e => { if (!element.contains(e.target) && e.target !== origin) closeKeywordEditor(); };
+        document.addEventListener('click', onOutside);
+        keywordEditor = { element, onOutside, origin }; input.focus();
+    }
+
+    function createButton(title, doubanId, names = searchNames(title)) {
+        const resolved = resolveSearchTitle(title);
+        if (!buildSearchUrl(resolved)) return null;
         const group = document.createElement('span');
         group.className = 'zcw-group';
-        const button = document.createElement('a');
-        button.className = BTN_CLASS;
-        button.textContent = CONFIG.BUTTON_TEXT;
-        button.href = url; button.target = '_blank'; button.rel = 'noopener noreferrer';
-        button.title = '在中创网搜索：' + resolved;
-        button.setAttribute('data-zcw-title', resolved);
-        if (doubanId) button.setAttribute('data-zcw-id', doubanId);
-        button.addEventListener('click', e => {
-            if (e.button !== 0 || e.ctrlKey || e.metaKey || e.shiftKey || e.altKey) return;
-            e.preventDefault(); e.stopPropagation(); openSearchUrl(url);
-        });
-        group.appendChild(button);
-        const bili = createBilibiliButton(resolved), soquark = createSoquarkButton(resolved);
-        if (bili) group.appendChild(bili);
-        if (soquark) group.appendChild(soquark);
+        const context = { names, keyword: resolved, mode: 'auto', links: [] };
+        for (const [className, text, buildUrl] of [[BTN_CLASS, CONFIG.BUTTON_TEXT, buildSearchUrl], [BILIBILI_BTN_CLASS, CONFIG.BILIBILI_BUTTON_TEXT, buildBilibiliSearchUrl], [SOQUARK_BTN_CLASS, CONFIG.SOQUARK_BUTTON_TEXT, buildSoquarkSearchUrl]]) {
+            const link = searchLink(resolved, className, text, buildUrl);
+            if (doubanId) link.setAttribute('data-zcw-id', doubanId);
+            context.links.push({ link, buildUrl }); group.appendChild(link);
+        }
+        const edit = document.createElement('button'); edit.type = 'button'; edit.className = 'zcw-keyword-edit'; edit.textContent = '关键词';
+        edit.title = '编辑搜索关键词'; edit.addEventListener('click', e => { e.preventDefault(); e.stopPropagation(); openKeywordEditor(context, edit); });
+        group.appendChild(edit);
         return group;
     }
-    function externalButton(title, className, text, buildUrl, action) {
-        if (typeof title !== 'string' || !title.trim()) return null;
-        const resolved = resolveSearchTitle(title);
-        if (!buildUrl(resolved)) return null;
-        const button = document.createElement('button');
-        button.type = 'button'; button.className = className; button.textContent = text;
-        button.title = text + '：' + resolved;
-        button.setAttribute('data-zcw-title', resolved);
-        button.addEventListener('click', e => {
-            e.preventDefault(); e.stopPropagation(); action(resolved);
-        });
-        return button;
-    }
     function createBilibiliButton(title) {
-        return externalButton(title, BILIBILI_BTN_CLASS, CONFIG.BILIBILI_BUTTON_TEXT,
-            buildBilibiliSearchUrl, title => ExternalSearchAction.openBilibili(title));
+        return searchLink(title, BILIBILI_BTN_CLASS, CONFIG.BILIBILI_BUTTON_TEXT, buildBilibiliSearchUrl);
     }
     function createSoquarkButton(title) {
-        return externalButton(title, SOQUARK_BTN_CLASS, CONFIG.SOQUARK_BUTTON_TEXT,
-            buildSoquarkSearchUrl, title => ExternalSearchAction.openSoquark(title));
+        return searchLink(title, SOQUARK_BTN_CLASS, CONFIG.SOQUARK_BUTTON_TEXT, buildSoquarkSearchUrl);
     }
 
     function insertButton(titleAnchor, btn) {
@@ -390,7 +504,8 @@
             const doubanId = subjectId(titleAnchor);
             const title = extractTitle(titleAnchor);
             if (!title) return;
-            entries.push({ doubanId, title, titleAnchor, markNode: box, mount: titleAnchor, mountMode: 'list' });
+            const raw = [titleAnchor.textContent, titleAnchor.getAttribute('title'), titleAnchor.querySelector('img')?.alt].filter(s => s?.trim()).join(' / ') || title;
+            entries.push({ doubanId, title, names: searchNames(title, raw), titleAnchor, markNode: box, mount: titleAnchor, mountMode: 'list' });
         });
         return entries;
     }
@@ -409,12 +524,13 @@
         if (!title) return [];
         // 挂载点：优先 h1；h1 缺失时退回 #content / root / body（保证按钮总能插入）
         const mount = h1 || document.querySelector('#content') || root || document.body;
-        return [{ doubanId: page.id, title, titleAnchor: h1 || mount, markNode: mount, mount: mount, mountMode: 'after' }];
+        const raw = h1?.textContent || document.title;
+        return [{ doubanId: page.id, title, names: searchNames(title, raw), titleAnchor: h1 || mount, markNode: mount, mount: mount, mountMode: 'after' }];
     }
 
 
     function renderActions(entry) {
-        const group = createButton(entry.title, entry.doubanId);
+        const group = createButton(entry.title, entry.doubanId, entry.names);
         if (!group) return false;
         if (entry.mountMode === 'after') {
             if (entry.mount === document.body) entry.mount.appendChild(group);
@@ -515,23 +631,57 @@
             });
         }
 
+        function sameNodes(root, nodes) {
+            const current = new Set(items(root));
+            return current.size === nodes.length && nodes.every(n => current.has(n));
+        }
+
+        function readFilters(s) {
+            const read = name => {
+                const text = s.inputs[name].value.trim();
+                if (!text) return null;
+                const n = Number(text);
+                if (!Number.isFinite(n)) throw new Error('请输入有效的筛选数字');
+                return n;
+            };
+            const filters = { ratingMin: read('ratingMin'), yearFrom: read('yearFrom'), yearTo: read('yearTo') };
+            if (filters.ratingMin !== null && (filters.ratingMin < 0 || filters.ratingMin > 10)) throw new Error('评分应在0到10之间');
+            for (const n of [filters.yearFrom, filters.yearTo]) {
+                if (n !== null && (!Number.isInteger(n) || n < 1000 || n > 9999)) throw new Error('年份应为四位整数');
+            }
+            if (filters.yearFrom !== null && filters.yearTo !== null && filters.yearFrom > filters.yearTo) throw new Error('起始年份不能大于结束年份');
+            return filters;
+        }
+
+        function matchesFilter(meta, filters) {
+            if (Object.values(filters).every(n => n === null)) return true;
+            if (!meta.movie) return false;
+            if (filters.ratingMin !== null && (meta.rating === null || meta.rating < filters.ratingMin)) return false;
+            if (filters.yearFrom !== null && (meta.year === null || meta.year < filters.yearFrom)) return false;
+            if (filters.yearTo !== null && (meta.year === null || meta.year > filters.yearTo)) return false;
+            return true;
+        }
+
         async function collect(s, signal, controller) {
-            const first = safePageUrl(location.href);
-            first.searchParams.set('start', '0');
-            let next = first, expected = pageCount(s.root), pages = 0;
-            const visited = new Set(), signatures = new Set(), entries = [];
-            const local = new Map(items(s.root).map(n => [itemKey(n), n]));
-            while (next) {
+            if (!s.pending) {
+                const first = safePageUrl(location.href); first.searchParams.set('start', '0');
+                const initial = items(s.root);
+                s.pending = { next: first.href, expected: pageCount(s.root), pages: 0, visited: new Set(),
+                    signatures: new Set(), entries: [], initial, local: new Map(initial.map(n => [itemKey(n), n])) };
+            }
+            const p = s.pending;
+            if (!sameNodes(s.root, p.initial)) throw new Error('片单条目发生变化，请刷新后重新加载');
+            while (p.next) {
                 if (signal.aborted) throw new Error('cancelled');
+                const next = safePageUrl(p.next);
                 const offset = pageKey(next);
-                if (visited.has(offset) || pages >= 1000) throw new Error('分页重复或页数异常');
-                visited.add(offset);
+                if (p.visited.has(offset) || p.pages >= 1000) throw new Error('分页重复或页数异常');
                 let root;
                 if (offset === pageKey(new URL(location.href))) {
                     root = s.root;
                 } else {
-                    if (pages) await pause(signal);
-                    s.message.textContent = `正在加载第 ${pages + 1} 页（已读取 ${entries.filter(e => e.meta.movie).length} 部影视）…`;
+                    if (p.pages) await pause(signal);
+                    s.message.textContent = `正在加载第 ${p.pages + 1} 页（已读取 ${p.entries.filter(e => e.meta.movie).length} 部影视）…`;
                     const timer = setTimeout(() => controller.abort('timeout'), 20000);
                     try {
                         const response = await fetch(next.href, { credentials: 'same-origin', signal });
@@ -546,79 +696,92 @@
                 }
                 const nodes = items(root);
                 const signature = nodes.map(itemKey).join('|');
-                if (!nodes.length || signatures.has(signature)) throw new Error('分页内容为空或重复');
-                signatures.add(signature);
-                expected = Math.max(expected, pageCount(root));
-                nodes.forEach(n => {
-                    const node = local.get(itemKey(n)) || importItem(n, next.href);
-                    entries.push({ node, meta: readMeta(node), order: entries.length });
-                });
-                pages++;
-                s.message.textContent = `已读取 ${pages} / ${expected} 页（${entries.filter(e => e.meta.movie).length} 部影视）…`;
+                if (!nodes.length || p.signatures.has(signature)) throw new Error('分页内容为空或重复');
+                const expected = Math.max(p.expected, pageCount(root));
                 const href = root.querySelector('.paginator .next a[href], .paginator a[rel="next"], .paginator link[rel="next"]')?.getAttribute('href');
-                next = href ? safePageUrl(new URL(href, next.href).href) : null;
-                if (!next && pages < expected) throw new Error('分页不完整，请刷新后重试');
+                const following = href ? safePageUrl(new URL(href, next.href).href) : null;
+                if (following && (pageKey(following) <= offset || p.visited.has(pageKey(following)))) throw new Error('分页重复或顺序异常');
+                if (!following && p.pages + 1 < expected) throw new Error('分页不完整，请刷新后重试');
+                if (!sameNodes(s.root, p.initial)) throw new Error('片单条目发生变化，请刷新后重新加载');
+                // 验证完一整页再保存检查点；失败页没有被标为已完成。
+                nodes.forEach(n => {
+                    const node = p.local.get(itemKey(n)) || importItem(n, next.href);
+                    p.entries.push({ node, meta: readMeta(node), order: p.entries.length, wasHidden: node.hidden });
+                });
+                p.visited.add(offset); p.signatures.add(signature); p.pages++; p.expected = expected;
+                p.next = following?.href || null;
+                s.message.textContent = `已读取 ${p.pages} / ${p.expected} 页（${p.entries.filter(e => e.meta.movie).length} 部影视）…`;
             }
-            return entries;
+            return p.entries;
         }
 
-        function render(s, mode) {
+        function render(s, mode, filters = s.filters) {
             const list = sortEntries(s.entries, mode);
             const old = items(s.root);
             const marker = document.createComment('zcw-doulist-items');
             old[0].before(marker);
             old.forEach(n => n.remove());
             const fragment = document.createDocumentFragment();
-            list.forEach(e => fragment.appendChild(e.node));
+            list.forEach(e => {
+                const excluded = !matchesFilter(e.meta, filters);
+                e.node.hidden = !!e.wasHidden || excluded;
+                e.node.toggleAttribute('data-zcw-filter-hidden', excluded);
+                fragment.appendChild(e.node);
+            });
             marker.replaceWith(fragment);
             s.root.querySelectorAll('.paginator').forEach(el => { el.hidden = true; });
-            s.applied = mode;
-            s.message.textContent = `已加载完整片单：${s.entries.filter(e => e.meta.movie).length} 部影视 · ${MODES.find(m => m[0] === mode)[1]}`;
+            s.applied = mode; s.select.value = mode; s.filters = filters;
+            const total = s.entries.filter(e => e.meta.movie).length;
+            const visible = s.entries.filter(e => e.meta.movie && !e.node.hidden).length;
+            s.message.textContent = `已加载完整片单：${total} 部影视 · 当前显示 ${visible} 部 · ${MODES.find(m => m[0] === mode)[1]}`;
             process();
         }
 
-        async function change(s) {
-            const mode = s.select.value;
+        async function change(s, forceLoad = false, requestedMode = s.select.value) {
+            const mode = requestedMode;
             if (!MODES.some(m => m[0] === mode) || s.controller) return;
-            const matches = nodes => {
-                const current = new Set(items(s.root));
-                return current.size === nodes.length && nodes.every(n => current.has(n));
-            };
+            let filters;
+            try { filters = readFilters(s); } catch (e) { s.message.textContent = e.message; s.select.value = s.applied; return; }
             if (s.entries) {
-                if (!matches(s.entries.map(e => e.node))) {
+                if (!sameNodes(s.root, s.entries.map(e => e.node))) {
                     s.select.value = s.applied;
                     s.message.textContent = '片单条目发生变化，请刷新页面后重新加载排序。';
                     return;
                 }
                 s.entries.forEach(e => { e.meta = readMeta(e.node); });
-                render(s, mode);
+                render(s, mode, filters);
                 return;
             }
-            if (mode === 'original') return;
+            if (mode === 'original' && !forceLoad && !s.pending && Object.values(filters).every(n => n === null)) return;
             const controller = new AbortController();
-            const initialNodes = items(s.root);
+            s.requestedMode = mode;
             s.controller = controller;
             s.bar.setAttribute('aria-busy', 'true');
             s.select.disabled = true;
             s.cancel.hidden = false;
+            s.resume.hidden = true;
+            [...Object.values(s.inputs), s.apply, s.clear].forEach(el => { el.disabled = true; });
             s.message.textContent = '正在加载完整片单…';
             try {
                 const entries = await collect(s, controller.signal, controller);
                 if (controller.signal.aborted) throw new Error('cancelled');
-                if (!matches(initialNodes)) throw new Error('片单条目发生变化，请刷新后重新加载');
+                if (!sameNodes(s.root, s.pending.initial)) throw new Error('片单条目发生变化，请刷新后重新加载');
                 s.entries = entries;
-                render(s, mode);
+                s.pending = null;
+                render(s, mode, filters);
             } catch (e) {
                 s.select.value = s.applied;
                 const reason = controller.signal.reason;
                 s.message.textContent = controller.signal.aborted && reason !== 'timeout'
-                    ? '已取消，保留原列表。'
-                    : '加载失败：' + (reason === 'timeout' ? '请求超时' : e.message) + '。保留原列表，可重新选择排序重试。';
+                    ? '已取消，保留原列表和已读取分页，可继续加载。'
+                    : '加载失败：' + (reason === 'timeout' ? '请求超时' : e.message) + '。保留原列表和已读取分页。';
             } finally {
                 s.controller = null;
                 s.bar.setAttribute('aria-busy', 'false');
                 s.select.disabled = false;
                 s.cancel.hidden = true;
+                s.resume.hidden = !s.pending;
+                [...Object.values(s.inputs), s.apply, s.clear].forEach(el => { el.disabled = false; });
             }
         }
 
@@ -642,19 +805,44 @@
             });
             label.appendChild(select);
             const cancel = document.createElement('button');
-            cancel.type = 'button'; cancel.textContent = '取消加载'; cancel.hidden = true;
+            cancel.type = 'button'; cancel.className = 'zcw-load-cancel'; cancel.textContent = '取消加载'; cancel.hidden = true;
+            const resume = document.createElement('button');
+            resume.type = 'button'; resume.className = 'zcw-load-resume'; resume.textContent = '继续加载'; resume.hidden = true;
             const message = document.createElement('span');
             message.setAttribute('role', 'status'); message.setAttribute('aria-live', 'polite');
             message.textContent = '选择排序后加载全部分页；上映时间按年份。';
-            bar.append(label, cancel, message);
+            bar.append(label, cancel, resume, message);
+            const filterBar = document.createElement('div'); filterBar.className = 'zcw-filter-controls';
+            filterBar.style.cssText = 'display:flex;flex-wrap:wrap;align-items:center;gap:8px;width:100%';
+            const inputs = {};
+            for (const [name, text, min, max, step] of [['ratingMin', '评分 ≥', 0, 10, 0.1], ['yearFrom', '年份从', 1000, 9999, 1], ['yearTo', '到', 1000, 9999, 1]]) {
+                const field = document.createElement('label'); field.textContent = text;
+                const input = document.createElement('input'); input.type = 'number'; input.name = name;
+                input.min = String(min); input.max = String(max); input.step = String(step);
+                input.setAttribute('aria-label', name === 'ratingMin' ? '最低评分' : name === 'yearFrom' ? '起始年份' : '结束年份');
+                input.style.cssText = 'box-sizing:border-box;width:84px;padding:5px;border:1px solid #aaa;border-radius:4px;font:inherit;color:inherit;background:transparent';
+                inputs[name] = input; field.appendChild(input); filterBar.appendChild(field);
+            }
+            const apply = document.createElement('button'); apply.type = 'button'; apply.className = 'zcw-filter-apply'; apply.textContent = '应用筛选';
+            const clear = document.createElement('button'); clear.type = 'button'; clear.className = 'zcw-filter-clear'; clear.textContent = '清空筛选';
+            filterBar.append(apply, clear); bar.appendChild(filterBar);
             const style = document.createElement('style');
             style.textContent = `#${ID}{display:flex;flex-wrap:wrap;align-items:center;gap:10px;padding:12px;margin:12px 0;border:1px solid #ddd;border-radius:4px;background:#f7f9fb;font-size:13px;color:#555}#${ID} select,#${ID} button{font:inherit;padding:5px 8px;border:1px solid #aaa;border-radius:4px;color:inherit;background:transparent;max-width:100%}#${ID} label{display:flex;align-items:center;gap:6px}#${ID} button{cursor:pointer}#${ID} [hidden]{display:none!important}#${ID} :focus-visible{outline:2px solid #197cff;outline-offset:2px}#${ID} [role=status]{font-size:12px} @media(prefers-color-scheme:dark){#${ID}{color:#ddd;background:#252525;border-color:#555}#${ID} select{color:#ddd;background:#252525}}`;
             (document.head || document.documentElement).appendChild(style);
             nodes[0].before(bar);
-            state = { root, bar, select, cancel, message, entries: null, applied: 'original', controller: null };
+            state = { root, bar, select, cancel, resume, message, inputs, apply, clear, entries: null, pending: null,
+                filters: { ratingMin: null, yearFrom: null, yearTo: null }, applied: 'original', requestedMode: 'original', controller: null };
             const s = state;
             select.addEventListener('change', () => { void change(s); });
             cancel.addEventListener('click', () => s.controller?.abort('cancelled'));
+            resume.addEventListener('click', () => { void change(s, true, s.requestedMode); });
+            apply.addEventListener('click', () => { void change(s, true); });
+            Object.values(inputs).forEach(input => input.addEventListener('keydown', e => { if (e.key === 'Enter') { e.preventDefault(); void change(s, true); } }));
+            clear.addEventListener('click', () => {
+                Object.values(inputs).forEach(input => { input.value = ''; });
+                if (s.entries) void change(s);
+                else s.message.textContent = '已清空筛选，选择排序或应用筛选后加载完整片单。';
+            });
         }
         return { ensure, readMeta, sortEntries };
     })();

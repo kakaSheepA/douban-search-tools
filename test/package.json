@@ -1,6 +1,6 @@
 {
   "scripts": {
-    "test": "node --test selector.test.mjs search-buttons.test.mjs doulist-sort.test.mjs slim-script.test.mjs",
+    "test": "node --test selector.test.mjs search-buttons.test.mjs doulist-sort.test.mjs slim-script.test.mjs workflow.test.mjs",
     "check": "node --check ../douban-wish-to-zhongchuang.user.js"
   },
   "dependencies": {

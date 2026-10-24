@@ -70,10 +70,10 @@ test('三个搜索地址使用同一中文关键词，SoQuark 编码路径保留
 
 test('三按钮顺序、中文搜索，三个入口均零写库', async t => {
     const { doc, tabs, writes, Z } = await boot(t);
-    const buttons = [...doc.querySelectorAll('.zcw-group > a, .zcw-group > button')];
+    const buttons = [...doc.querySelectorAll('.zcw-group > a')];
     assert.deepEqual(buttons.map(n => n.textContent), ['搜中创', '搜B站', '搜夸克']);
     const sq = doc.querySelector('.zcw-soquark-btn');
-    assert.equal(sq.tagName, 'BUTTON'); assert.equal(sq.type, 'button');
+    assert.equal(sq.tagName, 'A'); assert.equal(sq.target, '_blank');
     let bubbled = 0; sq.parentElement.addEventListener('click', () => bubbled++);
     sq.click();
     assert.equal(tabs.length, 1); assert.equal(tabs[0][0], 'https://www.soquark.com/s/' + encodeURIComponent('怪形前传') + '.html');
