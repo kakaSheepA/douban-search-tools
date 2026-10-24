@@ -1,12 +1,14 @@
 # 豆瓣快捷搜索与片单排序
 
-当前版本：**2.18.0**。新增搜网盘、搜字幕，保留IMDb/TMDB、自定义站点、影片操作菜单、片单筛选排序与失败续载。
+当前版本：**2.18.1**。搜夸克默认全网搜，保留搜网盘、搜字幕、IMDb/TMDB、自定义站点、影片操作菜单及片单筛选排序与失败续载。
 
 ## 快捷搜索
 
 在豆瓣影视标题旁显示：**搜中创 / 搜B站 / 搜夸克 / 搜网盘 / 更多**。
 
 新增“搜网盘”跳转PanSearch，地址为 `https://www.pansearch.me/search?keyword=片名`；“更多 → 搜字幕 · SubHD”跳转 `https://subhd.me/search/片名`。片名会正确编码，两个入口沿用中文名优先、英文回退以及当前条目的年份/季数开关。支持原生中键、Ctrl/Meta点击和复制链接，不新增权限或保存影片记录。
+
+“搜夸克”生成带 `#zcw-global` 标记的SoQuark搜索链接。在该搜索页等待网站Vue挂载后，仅通过网站原生按钮自动选择一次“全网搜”。已选中时不重复触发，随后手动改回“本地搜”不受干预。脚本新增运行范围 `https://www.soquark.com/s/*`，只有带该标记的搜索页才执行切换；普通进入的未标记页面不处理，也不读取或保存网站搜索历史。等待最多20秒，页面离开或成功后即停止。
 
 - 支持想看、在看、看过列表（grid / list）、影视详情、电影首页、影视片单和动态新增条目。
 - 搜索入口统一优先使用页面提供的中文名，没有中文名时使用英文名。例如「怪形前传 The Thing」搜索「怪形前传」，「Spider-Man」搜索英文名。
@@ -85,6 +87,7 @@ node test/probe-search-live.mjs
 node test/probe-doulist-live.mjs
 node test/probe-workflow-live.mjs
 node test/probe-more-actions.mjs
+node test/probe-soquark-global.mjs
 ```
 
 若依赖未安装，先运行 `npm --prefix test ci`。真实浏览器探针默认使用本机 Chrome，可设置 `CHROME_PATH` 指向其它 Chromium 浏览器。探针模拟GM API，不会安装或修改用户的Tampermonkey脚本。

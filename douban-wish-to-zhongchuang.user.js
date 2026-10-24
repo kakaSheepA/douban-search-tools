@@ -1,12 +1,13 @@
 // ==UserScript==
 // @name         豆瓣想看 → 搜中创
 // @namespace    https://github.com/local/douban-zhongchuang
-// @version      2.18.0
+// @version      2.18.1
 // @description  豆瓣中创/B站/夸克/网盘搜索，字幕与IMDb/TMDB、自定义站点；片单筛选排序及续载。仅保存站点设置。
 // @author       Senior Developer
 // @match        https://movie.douban.com/*
 // @match        https://www.douban.com/doulist/*
 // @match        https://douban.com/doulist/*
+// @match        https://www.soquark.com/s/*
 // @icon         https://www.douban.com/favicon.ico
 // @grant        GM_openInTab
 // @grant        GM_getValue
@@ -256,7 +257,7 @@
 
     function buildSoquarkSearchUrl(title, options) {
         const keyword = searchKeyword(title, options);
-        return keyword ? SOQUARK_SEARCH_URL + encodeURIComponent(keyword) + '.html' : null;
+        return keyword ? SOQUARK_SEARCH_URL + encodeURIComponent(keyword) + '.html#zcw-global' : null;
     }
 
 
@@ -1088,6 +1089,28 @@
         return null;
     }
 
+
+    // 仅处理从本脚本带标记打开的SoQuark搜索页；等待Vue完成挂载，避免初始HTML状态误判。
+    function initSoquarkGlobal() {
+        if (location.hostname !== 'www.soquark.com' || !/^\/s\/.+\.html$/.test(location.pathname) || location.hash !== '#zcw-global') return;
+        let observer, interval, timeout, finished = false;
+        const stop = () => {
+            finished = true; observer?.disconnect(); clearInterval(interval); clearTimeout(timeout);
+            window.removeEventListener('pagehide', stop);
+        };
+        const attempt = () => {
+            if (finished) return;
+            const tab = document.querySelector('[data-v-app] a[onclick="switchSource(1)"]');
+            if (!tab) return;
+            if (!tab.classList.contains('active')) tab.click();
+            stop();
+        };
+        observer = new MutationObserver(attempt);
+        observer.observe(document.documentElement, { childList: true, subtree: true, attributes: true, attributeFilter: ['data-v-app', 'class'] });
+        interval = setInterval(attempt, 200); timeout = setTimeout(stop, 20000);
+        window.addEventListener('pagehide', stop, { once: true }); attempt();
+    }
+    initSoquarkGlobal();
 
     function boot() {
         currentPage = detectPage();

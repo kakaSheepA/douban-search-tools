@@ -53,7 +53,9 @@ try {
     await (await page.$('.doulist-item .title')).screenshot({ path: path.join(out, 'buttons-dark.png') });
     const target = await browser.newPage();
     await target.goto(external.tabs[0].u, { waitUntil: 'domcontentloaded', timeout: 45000 });
-    const destination = { url: target.url(), title: await target.title() };
+    await target.addScriptTag({ content: source });
+    await target.waitForFunction(() => document.querySelector('[data-v-app] a[onclick="switchSource(1)"]')?.classList.contains('active'), { timeout: 25000 });
+    const destination = { url: target.url(), title: await target.title(), source: '全网搜' };
     assert.equal(new URL(destination.url).hostname, 'www.soquark.com');
     assert.equal(decodeURIComponent(new URL(destination.url).pathname), '/s/怪形前传.html');
     const results = { before, external, keyboard, zc, destination };

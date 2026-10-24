@@ -63,7 +63,7 @@ test('三个搜索地址使用同一中文关键词，SoQuark 编码路径保留
     const raw = 'Who? What# & Why';
     const u = new URL(Z.buildSoquarkSearchUrl(raw));
     assert.equal(decodeURIComponent(u.pathname), '/s/' + raw + '.html');
-    assert.equal(u.search, ''); assert.equal(u.hash, '');
+    assert.equal(u.search, ''); assert.equal(u.hash, '#zcw-global');
     assert.equal(Z.buildSoquarkSearchUrl(''), null);
     assert.equal(Z.buildSoquarkSearchUrl(null), null);
 });
@@ -76,7 +76,7 @@ test('四按钮顺序、中文搜索，原三个入口均零写库', async t => 
     assert.equal(sq.tagName, 'A'); assert.equal(sq.target, '_blank');
     let bubbled = 0; sq.parentElement.addEventListener('click', () => bubbled++);
     sq.click();
-    assert.equal(tabs.length, 1); assert.equal(tabs[0][0], 'https://www.soquark.com/s/' + encodeURIComponent('怪形前传') + '.html');
+    assert.equal(tabs.length, 1); assert.equal(tabs[0][0], 'https://www.soquark.com/s/' + encodeURIComponent('怪形前传') + '.html#zcw-global');
     assert.equal(bubbled, 0); assert.equal(writes.length, 0);
     doc.querySelector('.zcw-bilibili-btn').click();
     assert.equal(new URL(tabs[1][0]).searchParams.get('keyword'), '怪形前传'); assert.equal(writes.length, 0);
@@ -91,7 +91,7 @@ test('详情页和动态新增条目也有SoQuark，英文回退不被连字符�
     const html = '<html><head><title>Spider-Man (2002) - 豆瓣电影</title></head><body><div id="content"><div class="article"><h1><span property="v:itemreviewed">蜘蛛侠 Spider-Man</span></h1></div></div></body></html>';
     const { doc, Z, tabs } = await boot(t, html, 'https://movie.douban.com/subject/123/');
     doc.querySelector('.zcw-soquark-btn').click();
-    assert.match(decodeURIComponent(tabs[0][0]), /蜘蛛侠\.html$/);
+    assert.match(decodeURIComponent(new URL(tabs[0][0]).pathname), /蜘蛛侠\.html$/);
     assert.equal(Z.resolveSearchTitle(''), 'Spider-Man');
     const b = await boot(t);
     b.doc.querySelector('.article').insertAdjacentHTML('beforeend', '<div class="doulist-item"><div class="title"><a href="https://movie.douban.com/subject/456/">The Thing</a></div></div>');
