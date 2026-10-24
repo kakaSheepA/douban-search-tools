@@ -1,0 +1,40 @@
+# Dependencies and generated browser verification artifacts
+node_modules/
+/test/*verification/
+/test/shots*/
+/test/shot-*.png
+*.log
+
+# Local backups, agent state and temporary files
+/.verify-backup/
+/.workbuddy/
+/.tmp*
+.DS_Store
+Thumbs.db
+.env
+.env.*
+!.env.example
+
+# Historical release packages and development notes remain local
+/release/
+/docs/superpowers/
+/PHASE*.md
+/V2.*-PLAN.md
+/pre-release-check-*.md
+/stage*-checklist.md
+/probe-stage*.mjs
+/RELEASE-v2.8.2.md
+/RELEASE-v2.9.0.md
+/RELEASE-v2.10.0.md
+/RELEASE-v2.11.0.md
+/RELEASE-v2.12.0.md
+
+# Historical probes for removed features
+/test/probe-5*-visual.mjs
+/test/probe-6*-visual.mjs
+/test/probe-stage3-visual.mjs
+/test/probe-zc-final.mjs
+/test/preview.html
+/test/fixtures/zc-*
+!/test/fixtures/zc-result-withid.html
+/test/fixtures/douban-subject-real.html

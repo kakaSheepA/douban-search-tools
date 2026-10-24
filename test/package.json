@@ -1,0 +1,10 @@
+{
+  "scripts": {
+    "test": "node --test selector.test.mjs search-buttons.test.mjs doulist-sort.test.mjs slim-script.test.mjs",
+    "check": "node --check ../douban-wish-to-zhongchuang.user.js"
+  },
+  "dependencies": {
+    "jsdom": "^30.0.1",
+    "puppeteer-core": "^25.4.0"
+  }
+}
